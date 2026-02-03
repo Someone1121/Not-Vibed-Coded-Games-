@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Volley Duel (Solo)</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div class="title">Volley Duel</div>
+          <div class="subtitle">1-Player • 2D • Physics • AI Opponent</div>
+        </div>
+      </div>
+
+      <div class="hud">
+        <div class="pill"><span class="label">You</span><span id="scoreL" class="value">0</span></div>
+        <div class="pill netpill">First to 11</div>
+        <div class="pill"><span class="label">AI</span><span id="scoreR" class="value">0</span></div>
+      </div>
+    </header>
+
+    <main class="main">
+      <canvas id="c" width="1100" height="650"></canvas>
+
+      <div class="panel">
+        <div class="panel-title">Controls</div>
+        <div class="row"><kbd>A</kbd>/<kbd>D</kbd> move</div>
+        <div class="row"><kbd>W</kbd> jump</div>
+        <div class="row"><kbd>Space</kbd> spike/boost (mid-air too)</div>
+        <div class="row"><kbd>R</kbd> restart</div>
+        <div class="divider"></div>
+        <div class="row small">Tip: Jump + Space near the ball for a satisfying hit.</div>
+      </div>
+
+      <div id="toast" class="toast hidden"></div>
+    </main>
+
+    <footer class="footer">
+      <span>Made with Canvas • No libraries • Just open index.html</span>
+      <span class="dot">•</span>
+      <span class="muted">If you want sound, I’ll show you how to add a tiny beep system.</span>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
