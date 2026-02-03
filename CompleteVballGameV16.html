@@ -29,12 +29,66 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const gravity = 0.35;          // slightly slower, more airtime
-const groundY = 340;
-const netLeft = 445;
-const netRight = 455;
-const netTop = 260;
-const netBottom = 430;
+// ================== Configuration Constants ==================
+const CONFIG = {
+  // Physics
+  GRAVITY: 0.35,
+  GROUND_Y: 340,
+  
+  // Net dimensions
+  NET_LEFT: 445,
+  NET_RIGHT: 455,
+  NET_TOP: 260,
+  NET_BOTTOM: 430,
+  
+  // Player dimensions
+  PLAYER_WIDTH: 40,
+  PLAYER_HEIGHT: 90,
+  
+  // Player movement
+  PLAYER_SPEED: 3.7,
+  PLAYER_JUMP_POWER: 13.5,
+  PLAYER_MAX_STAMINA: 100,
+  
+  // Bot tuning
+  BOT_SPEED: 4.25,
+  BOT_JUMP_POWER: 13.4,
+  
+  // Player colors
+  PLAYER_COLOR: "#1e88e5",
+  CPU_COLOR: "#e53935",
+  
+  // Audio defaults
+  AUDIO_DEFAULT_FREQ: 440,
+  AUDIO_DEFAULT_DURATION: 0.12,
+  AUDIO_DEFAULT_ATTACK: 0.005,
+  AUDIO_DEFAULT_DECAY: 0.2,
+  AUDIO_NOISE_DURATION: 0.08,
+  AUDIO_NOISE_VOLUME: 0.18,
+  
+  // UI positioning
+  STAMINA_BAR_MARGIN: 20,
+  STAMINA_BAR_WIDTH: 220,
+  STAMINA_BAR_HEIGHT: 16,
+  STAMINA_BAR_Y: 20,
+  
+  // FX
+  TRAIL_OPACITY_DECAY: 0.88,
+  PARTICLE_OPACITY_DECAY: 0.96,
+  PARTICLE_SIZE_DECAY: 0.93,
+  
+  // Timing
+  STEP_MS: 1000 / 60  // Fixed-step timing at 60fps
+};
+
+// Convenience references for backward compatibility
+const gravity = CONFIG.GRAVITY;
+const groundY = CONFIG.GROUND_Y;
+const netLeft = CONFIG.NET_LEFT;
+const netRight = CONFIG.NET_RIGHT;
+const netTop = CONFIG.NET_TOP;
+const netBottom = CONFIG.NET_BOTTOM;
+
 let keys = {};
 let frameCount = 0;
 let cameraShake = 0;
@@ -123,7 +177,7 @@ const maps = [
   }
 ];
 // Fixed-step timing to avoid refresh-rate speedups
-const STEP = 1000 / 60; // ms per tick
+const STEP = CONFIG.STEP_MS;
 let lastTime = performance.now();
 let accumulator = 0;
 
@@ -207,11 +261,11 @@ function ensureAudio() {
   return audioCtx;
 }
 
-function playTone(freq = 440, duration = 0.12, {
+function playTone(freq = CONFIG.AUDIO_DEFAULT_FREQ, duration = CONFIG.AUDIO_DEFAULT_DURATION, {
   type = "sine",
   volume = 0.25,
-  attack = 0.005,
-  decay = 0.2,
+  attack = CONFIG.AUDIO_DEFAULT_ATTACK,
+  decay = CONFIG.AUDIO_DEFAULT_DECAY,
   sweep = 0
 } = {}) {
   if (masterVolume <= 0) return;
@@ -240,7 +294,7 @@ function playTone(freq = 440, duration = 0.12, {
   } catch (e) { /* ignore */ }
 }
 
-function playNoise(duration = 0.08, volume = 0.18, {type = "white"} = {}) {
+function playNoise(duration = CONFIG.AUDIO_NOISE_DURATION, volume = CONFIG.AUDIO_NOISE_VOLUME, {type = "white"} = {}) {
   if (masterVolume <= 0) return;
   try {
     volume *= masterVolume * (settings.soundStyle === "soft" ? 0.72 : 1);
@@ -354,8 +408,8 @@ function spawnDust(x, y, dir = 0) {
 function updateFX() {
   for (let i = fxTrails.length - 1; i >= 0; i--) {
     const t = fxTrails[i];
-    t.alpha *= 0.88;
-    t.scale *= 0.96;
+    t.alpha *= CONFIG.TRAIL_OPACITY_DECAY;
+    t.scale *= CONFIG.PARTICLE_OPACITY_DECAY;
     t.life -= 1;
     if (t.life <= 0 || t.alpha < 0.02) fxTrails.splice(i, 1);
   }
@@ -365,7 +419,7 @@ function updateFX() {
     p.x += p.vx;
     p.y += p.vy;
     p.vy += p.g;
-    p.alpha *= 0.93;
+    p.alpha *= CONFIG.PARTICLE_SIZE_DECAY;
     p.life -= 1;
     if (p.life <= 0 || p.alpha < 0.03) fxParticles.splice(i, 1);
   }
@@ -410,24 +464,24 @@ function drawFX() {
 
 // ================== Player Class ==================
 class Player {
-  constructor(x, side, isBot = false, color = "#1e88e5") {
+  constructor(x, side, isBot = false, color = CONFIG.PLAYER_COLOR) {
     this.startX = x;
     this.x = x;
     this.y = groundY;
-    this.w = 40;
-    this.h = 90;
+    this.w = CONFIG.PLAYER_WIDTH;
+    this.h = CONFIG.PLAYER_HEIGHT;
     this.vx = 0;
     this.vy = 0;
-    this.speed = 3.7;          // slightly slower
-    this.jumpPower = 13.5;
+    this.speed = CONFIG.PLAYER_SPEED;
+    this.jumpPower = CONFIG.PLAYER_JUMP_POWER;
     this.score = 0;
     this.side = side;
     this.isBot = isBot;
     this.color = color;
     this.lastHitFrame = {};
     this.wasGrounded = true;
-    this.stamina = 100;
-    this.maxStamina = 100;
+    this.stamina = CONFIG.PLAYER_MAX_STAMINA;
+    this.maxStamina = CONFIG.PLAYER_MAX_STAMINA;
     this.netHangFrames = 0;
     this.netInteractCount = 0;
     this.netInteractWindowStart = -999;
@@ -436,14 +490,12 @@ class Player {
     this.diveDir = 1;
     this.diveCooldown = 0;
     this.postDiveStun = 0;
-    this.diveCooldown = 0;
-    this.postDiveStun = 0;
     this.sprinting = false;
 
     // Bot tuning: keep speed up but avoid floaty hang time
     if (this.isBot) {
-      this.speed = 4.25;
-      this.jumpPower = 13.4;
+      this.speed = CONFIG.BOT_SPEED;
+      this.jumpPower = CONFIG.BOT_JUMP_POWER;
     }
   }
 
@@ -861,60 +913,82 @@ class Player {
     const frontLeg = limbChain(frontHip.x, frontHip.y, frontLegAng, frontLegBend, thighLen, shinLen);
     const backLeg = limbChain(backHip.x, backHip.y, backLegAng, backLegBend, thighLen, shinLen);
 
-    // Legs with shadow
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(frontHip.x, frontHip.y);
-    ctx.lineTo(frontLeg.knee.x, frontLeg.knee.y);
-    ctx.moveTo(frontLeg.knee.x, frontLeg.knee.y);
-    ctx.lineTo(frontLeg.foot.x, frontLeg.foot.y);
-    ctx.moveTo(backHip.x, backHip.y);
-    ctx.lineTo(backLeg.knee.x, backLeg.knee.y);
-    ctx.moveTo(backLeg.knee.x, backLeg.knee.y);
-    ctx.lineTo(backLeg.foot.x, backLeg.foot.y);
-    ctx.stroke();
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(frontHip.x, frontHip.y);
-    ctx.lineTo(frontLeg.knee.x, frontLeg.knee.y);
-    ctx.moveTo(frontLeg.knee.x, frontLeg.knee.y);
-    ctx.lineTo(frontLeg.foot.x, frontLeg.foot.y);
-    ctx.moveTo(backHip.x, backHip.y);
-    ctx.lineTo(backLeg.knee.x, backLeg.knee.y);
-    ctx.moveTo(backLeg.knee.x, backLeg.knee.y);
-    ctx.lineTo(backLeg.foot.x, backLeg.foot.y);
-    ctx.stroke();
-
-    // Arms
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(frontShoulder.x, frontShoulder.y);
-    ctx.lineTo(frontArm.knee.x, frontArm.knee.y);
-    ctx.moveTo(frontArm.knee.x, frontArm.knee.y);
-    ctx.lineTo(frontArm.foot.x, frontArm.foot.y);
-    ctx.moveTo(backShoulder.x, backShoulder.y);
-    ctx.lineTo(backArm.knee.x, backArm.knee.y);
-    ctx.moveTo(backArm.knee.x, backArm.knee.y);
-    ctx.lineTo(backArm.foot.x, backArm.foot.y);
-    ctx.stroke();
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(frontShoulder.x, frontShoulder.y);
-    ctx.lineTo(frontArm.knee.x, frontArm.knee.y);
-    ctx.moveTo(frontArm.knee.x, frontArm.knee.y);
-    ctx.lineTo(frontArm.foot.x, frontArm.foot.y);
-    ctx.moveTo(backShoulder.x, backShoulder.y);
-    ctx.lineTo(backArm.knee.x, backArm.knee.y);
-    ctx.moveTo(backArm.knee.x, backArm.knee.y);
-    ctx.lineTo(backArm.foot.x, backArm.foot.y);
-    ctx.stroke();
+    // Draw legs and arms using helper function
+    const legs = [
+      { start: frontHip, joint: frontLeg.knee, end: frontLeg.foot },
+      { start: backHip, joint: backLeg.knee, end: backLeg.foot }
+    ];
+    const arms = [
+      { start: frontShoulder, joint: frontArm.knee, end: frontArm.foot },
+      { start: backShoulder, joint: backArm.knee, end: backArm.foot }
+    ];
+    
+    drawLimbs(legs, this.color);
+    drawLimbs(arms, this.color);
 
     ctx.restore();
   }
+}
+
+// ================== Helper Functions ==================
+/**
+ * Draw a limb with shadow effect
+ * @param {object} start - Start point {x, y}
+ * @param {object} joint - Middle joint point {x, y}
+ * @param {object} end - End point {x, y}
+ * @param {string} color - Color for the limb
+ */
+function drawLimbWithShadow(start, joint, end, color) {
+  // Draw shadow
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(joint.x, joint.y);
+  ctx.moveTo(joint.x, joint.y);
+  ctx.lineTo(end.x, end.y);
+  ctx.stroke();
+  
+  // Draw colored limb
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(joint.x, joint.y);
+  ctx.moveTo(joint.x, joint.y);
+  ctx.lineTo(end.x, end.y);
+  ctx.stroke();
+}
+
+/**
+ * Draw multiple limbs at once
+ * @param {array} limbs - Array of limb data [{start, joint, end}, ...]
+ * @param {string} color - Color for all limbs
+ */
+function drawLimbs(limbs, color) {
+  // Draw all shadows first
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  for (const limb of limbs) {
+    ctx.moveTo(limb.start.x, limb.start.y);
+    ctx.lineTo(limb.joint.x, limb.joint.y);
+    ctx.moveTo(limb.joint.x, limb.joint.y);
+    ctx.lineTo(limb.end.x, limb.end.y);
+  }
+  ctx.stroke();
+  
+  // Draw all colored limbs
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (const limb of limbs) {
+    ctx.moveTo(limb.start.x, limb.start.y);
+    ctx.lineTo(limb.joint.x, limb.joint.y);
+    ctx.moveTo(limb.joint.x, limb.joint.y);
+    ctx.lineTo(limb.end.x, limb.end.y);
+  }
+  ctx.stroke();
 }
 
 // ================== Ball Class (FIXED SPIKE + FEINTS) ==================
@@ -1896,8 +1970,8 @@ else if (type === "spike") {
 
 // ================== Game Setup ==================
 let serveFromLeft = true;
-const p1 = new Player(150, "left", false, "#1e88e5"); // blue
-const p2 = new Player(710, "right", true, "#e53935"); // red
+const p1 = new Player(150, "left", false, CONFIG.PLAYER_COLOR);
+const p2 = new Player(710, "right", true, CONFIG.CPU_COLOR);
 function applyBotDifficulty() {
   const mode = settings.botDifficulty;
   if (mode === "easy") {
