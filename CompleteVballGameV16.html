@@ -1,0 +1,2754 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Volleyball Game 3.0</title>
+  <style>
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 20%, #8fd4ff 0%, #5aa7f5 35%, #245f9a 100%);
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      margin: 16px auto 28px auto;
+      width: min(1200px, 96vw);
+      aspect-ratio: 9 / 5;
+      height: auto;
+      background: #0a1b2a;
+      border-radius: 14px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05);
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="game" width="900" height="500"></canvas>
+
+<script>
+// ================== Core Setup ==================
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const gravity = 0.35;          // slightly slower, more airtime
+const groundY = 340;
+const netLeft = 445;
+const netRight = 455;
+const netTop = 260;
+const netBottom = 430;
+let keys = {};
+let frameCount = 0;
+let cameraShake = 0;
+let paused = false;
+let masterVolume = 1;
+let botServeDelayFrames = 0;
+const settings = {
+  fxParticles: true,
+  fxTrails: true,
+  screenShake: true,
+  trailStyle: "glow",
+  soundStyle: "bright",
+  soundLevel: 1,
+  botDifficulty: "normal",
+  targetScore: 10,
+  mapIndex: 0
+};
+
+const maps = [
+  {
+    name: "Sunny Bay",
+    sky: ["#8bd5ff", "#5ba9f5", "#2a4f7f"],
+    sun: { main: "rgba(255,241,200,0.95)", halo: "rgba(255,205,120,0.7)", radius: 120, alpha: 1 },
+    raysAlpha: 0.16,
+    cloudColor: "rgba(255,255,255,0.78)",
+    horizon: ["rgba(255,230,180,0.4)", "rgba(255,230,180,0)"],
+    water: ["#1d4f87", "#163c6e"],
+    sand: ["#f5e1b8", "#e0c58f"],
+    crowdBase: "#1f2b33",
+    crowdAccent: "rgba(255,255,255,0.07)",
+    vignetteAlpha: 0.22
+  },
+  {
+    name: "Sunset Pier",
+    sky: ["#ffcf9f", "#ff8a7a", "#5c2c5f"],
+    sun: { main: "rgba(255,180,120,0.9)", halo: "rgba(255,120,120,0.65)", radius: 140, alpha: 1 },
+    raysAlpha: 0.22,
+    cloudColor: "rgba(255,255,255,0.7)",
+    horizon: ["rgba(255,160,140,0.45)", "rgba(255,160,140,0)",],
+    water: ["#5a2b78", "#2f1f52"],
+    sand: ["#f2c18a", "#d4976b"],
+    crowdBase: "#2a1f33",
+    crowdAccent: "rgba(255,200,200,0.08)",
+    vignetteAlpha: 0.26
+  },
+  {
+    name: "Neon Night",
+    sky: ["#132040", "#0c122d", "#050712"],
+    sun: { main: "rgba(120,200,255,0.35)", halo: "rgba(120,120,255,0.25)", radius: 90, alpha: 0.6 },
+    raysAlpha: 0.06,
+    cloudColor: "rgba(200,220,255,0.28)",
+    horizon: ["rgba(120,160,255,0.18)", "rgba(120,160,255,0)"],
+    water: ["#182c5c", "#0f1c42"],
+    sand: ["#2a2e3a", "#1b1f2c"],
+    crowdBase: "#0f1220",
+    crowdAccent: "rgba(120,200,255,0.08)",
+    vignetteAlpha: 0.32
+  },
+  {
+    name: "Arena Hardwood",
+    indoor: true,
+    sky: ["#222630", "#1b1f2a", "#10141f"],
+    sun: { main: "rgba(255,255,255,0.2)", halo: "rgba(255,255,255,0.12)", radius: 90, alpha: 0 },
+    raysAlpha: 0,
+    cloudColor: "rgba(255,255,255,0.06)",
+    horizon: ["rgba(255,220,180,0.12)", "rgba(255,220,180,0)"],
+    water: ["#1a2335", "#11182b"],
+    sand: ["#c89b58", "#9b7238"],
+    crowdBase: "#0f111a",
+    crowdAccent: "rgba(255,255,255,0.05)",
+    vignetteAlpha: 0.28
+  },
+  {
+    name: "Campus Gym",
+    indoor: true,
+    sky: ["#2c3a52", "#232c3f", "#171d2c"],
+    sun: { main: "rgba(255,255,240,0.75)", halo: "rgba(255,220,150,0.4)", radius: 120, alpha: 0.55 },
+    raysAlpha: 0.08,
+    cloudColor: "rgba(255,255,255,0.06)",
+    horizon: ["rgba(220,210,200,0.18)", "rgba(220,210,200,0)"],
+    water: ["#1b2538", "#141c2c"],
+    sand: ["#d1b07a", "#b78c53"],
+    crowdBase: "#111622",
+    crowdAccent: "rgba(80,180,255,0.06)",
+    vignetteAlpha: 0.3
+  }
+];
+// Fixed-step timing to avoid refresh-rate speedups
+const STEP = 1000 / 60; // ms per tick
+let lastTime = performance.now();
+let accumulator = 0;
+
+document.addEventListener("keydown", e => {
+  const key = (e.key || "").toLowerCase();
+  if (key === "m") {
+    masterVolume = masterVolume > 0 ? 0 : settings.soundLevel;
+    return;
+  }
+  if (key === "p" || key === "escape") {
+    paused = !paused;
+    keys = {};
+    lastTime = performance.now();
+    return;
+  }
+
+  // Pause-menu toggles
+  if (paused) {
+    if (key === "1") {
+      const levels = [1, 0.6, 0];
+      const idx = levels.findIndex(v => Math.abs(v - settings.soundLevel) < 0.001);
+      settings.soundLevel = levels[(idx + 1) % levels.length];
+      masterVolume = settings.soundLevel;
+      return;
+    }
+    if (key === "2") {
+      settings.fxTrails = !settings.fxTrails;
+      return;
+    }
+    if (key === "3") {
+      settings.fxParticles = !settings.fxParticles;
+      return;
+    }
+    if (key === "4") {
+      settings.screenShake = !settings.screenShake;
+      if (!settings.screenShake) cameraShake = 0;
+      return;
+    }
+    if (key === "5") {
+      settings.trailStyle = settings.trailStyle === "glow" ? "ember" : "glow";
+      return;
+    }
+    if (key === "6") {
+      settings.soundStyle = settings.soundStyle === "bright" ? "soft" : "bright";
+      return;
+    }
+    if (key === "7") {
+      const modes = ["easy", "normal", "hard"];
+      const idx = modes.indexOf(settings.botDifficulty);
+      settings.botDifficulty = modes[(idx + 1) % modes.length];
+      applyBotDifficulty();
+      return;
+    }
+    if (key === "8") {
+      const lengths = [10, 15, 21];
+      const idx = lengths.indexOf(settings.targetScore);
+      settings.targetScore = lengths[(idx + 1) % lengths.length];
+      return;
+    }
+    if (key === "9") {
+      settings.mapIndex = (settings.mapIndex + 1) % maps.length;
+      return;
+    }
+  }
+  if (key === "shift") {
+    e.preventDefault();
+    keys["shift"] = true; // tracked but unused
+    return;
+  }
+  keys[key] = true;
+});
+document.addEventListener("keyup", e => {
+  const key = (e.key || "").toLowerCase();
+  keys[key] = false;
+});
+
+// ================== Sound + FX System ==================
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq = 440, duration = 0.12, {
+  type = "sine",
+  volume = 0.25,
+  attack = 0.005,
+  decay = 0.2,
+  sweep = 0
+} = {}) {
+  if (masterVolume <= 0) return;
+  try {
+    const styleScale = settings.soundStyle === "soft" ? 0.8 : 1;
+    volume *= masterVolume * styleScale;
+    const ctx = ensureAudio();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    if (sweep !== 0) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq * sweep), now + duration);
+    }
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(volume, now + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(duration, decay));
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + Math.max(duration, decay) + 0.02);
+  } catch (e) { /* ignore */ }
+}
+
+function playNoise(duration = 0.08, volume = 0.18, {type = "white"} = {}) {
+  if (masterVolume <= 0) return;
+  try {
+    volume *= masterVolume * (settings.soundStyle === "soft" ? 0.72 : 1);
+    const ctx = ensureAudio();
+    const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (type === "pink" ? Math.random() : 1);
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    noise.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + duration + 0.02);
+  } catch (e) { /* ignore */ }
+}
+
+function playSound(name = "ping", { intensity = 1 } = {}) {
+  const toneType = settings.soundStyle === "soft" ? "sine" : "triangle";
+  const percussive = settings.soundStyle === "soft" ? "sine" : "sawtooth";
+  const accentVol = (settings.soundStyle === "soft" ? 0.18 : 0.24) * intensity;
+  switch (name) {
+    case "receive":
+      playTone(540, 0.09, { type: toneType, volume: 0.22 * intensity });
+      playTone(420, 0.11, { type: "sine", volume: 0.14 * intensity });
+      break;
+    case "set":
+      playTone(610, 0.12, { type: "sine", volume: accentVol });
+      playTone(880, 0.14, { type: toneType, volume: 0.12 * intensity, sweep: 1.15 });
+      break;
+    case "spike":
+      playTone(320, 0.08, { type: percussive, volume: 0.28 * intensity, sweep: 0.6 });
+      playNoise(0.08, 0.12 * intensity, { type: "pink" });
+      break;
+    case "feint":
+      playTone(500, 0.1, { type: toneType, volume: 0.2 * intensity });
+      break;
+    case "score":
+      playTone(520, 0.16, { type: toneType, volume: 0.25 * intensity });
+      playTone(780, 0.16, { type: "sine", volume: 0.18 * intensity });
+      setTimeout(() => playTone(660, 0.14, { type: "sine", volume: 0.18 * intensity }), 80);
+      break;
+    case "net":
+      playTone(260, 0.08, { type: "sine", volume: 0.18 * intensity });
+      playNoise(0.05, 0.08 * intensity);
+      break;
+    case "superSpike":
+      playTone(220, 0.12, { type: percussive, volume: 0.32 * intensity, sweep: 0.55 });
+      playTone(520, 0.16, { type: settings.soundStyle === "soft" ? "triangle" : "square", volume: 0.22 * intensity, sweep: 0.4 });
+      playNoise(0.1, 0.16 * intensity, { type: "pink" });
+      break;
+    case "whoosh":
+      playNoise(0.08, 0.1 * intensity, { type: "pink" });
+      playTone(180, 0.05, { type: "sine", volume: 0.12 * intensity, sweep: 0.5 });
+      break;
+    case "land":
+      playNoise(0.08, 0.12 * intensity, { type: "pink" });
+      playTone(160, 0.05, { type: "sine", volume: 0.12 * intensity });
+      break;
+    default:
+      playTone(440, 0.09, { type: "square", volume: 0.16 });
+  }
+}
+
+function distance(x1, y1, x2, y2) {
+  let dx = x1 - x2;
+  let dy = y1 - y2;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+// ================== FX Helpers ==================
+const fxTrails = [];
+const fxParticles = [];
+
+function spawnTrail(x, y, vx, vy) {
+  if (!settings.fxTrails) return;
+  const speed = Math.hypot(vx, vy);
+  if (speed < 3) return;
+  fxTrails.push({ x, y, alpha: 0.32, scale: 1 + Math.min(0.8, speed / 10), life: 14, style: settings.trailStyle, speed });
+}
+
+function spawnBurst(x, y, { color = "rgba(255,255,255,0.9)", count = 12, spread = 2.4, speed = 3.8, gravity: g = 0.25, size = 4 } = {}) {
+  if (!settings.fxParticles) return;
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * spread - Math.PI * spread / 2;
+    const mag = speed * (0.5 + Math.random() * 0.7);
+    fxParticles.push({
+      x,
+      y,
+      vx: Math.cos(ang) * mag,
+      vy: Math.sin(ang) * mag,
+      g,
+      alpha: 0.9,
+      size: size * (0.6 + Math.random() * 0.8),
+      color,
+      life: 22
+    });
+  }
+}
+
+function spawnDust(x, y, dir = 0) {
+  spawnBurst(x, y, { color: "rgba(245, 203, 147, 0.9)", count: 10, spread: 1.6, speed: 2.3 + Math.abs(dir) * 0.4, gravity: 0.4, size: 5 });
+}
+
+function updateFX() {
+  for (let i = fxTrails.length - 1; i >= 0; i--) {
+    const t = fxTrails[i];
+    t.alpha *= 0.88;
+    t.scale *= 0.96;
+    t.life -= 1;
+    if (t.life <= 0 || t.alpha < 0.02) fxTrails.splice(i, 1);
+  }
+
+  for (let i = fxParticles.length - 1; i >= 0; i--) {
+    const p = fxParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += p.g;
+    p.alpha *= 0.93;
+    p.life -= 1;
+    if (p.life <= 0 || p.alpha < 0.03) fxParticles.splice(i, 1);
+  }
+}
+
+function drawFX() {
+  // trails behind the ball
+  for (const t of fxTrails) {
+    ctx.save();
+    ctx.globalAlpha = t.alpha;
+    const grad = ctx.createRadialGradient(t.x, t.y, 2, t.x, t.y, 18 * t.scale);
+    const speed = t.speed || 0;
+    if (t.style === "ember") {
+      const core = speed > 11 ? "rgba(255,230,180,0.95)" : "rgba(255,220,120,0.9)";
+      const rim = speed > 11 ? "rgba(255,110,80,0)" : "rgba(255,80,80,0)";
+      grad.addColorStop(0, core);
+      grad.addColorStop(1, rim);
+    } else {
+      const core = speed > 11 ? "rgba(140,210,255,0.95)" : "rgba(255,255,255,0.85)";
+      const rim = speed > 11 ? "rgba(255,120,230,0)" : "rgba(82, 177, 255, 0)";
+      grad.addColorStop(0, core);
+      grad.addColorStop(1, rim);
+    }
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 18 * t.scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // particles on top
+  for (const p of fxParticles) {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ================== Player Class ==================
+class Player {
+  constructor(x, side, isBot = false, color = "#1e88e5") {
+    this.startX = x;
+    this.x = x;
+    this.y = groundY;
+    this.w = 40;
+    this.h = 90;
+    this.vx = 0;
+    this.vy = 0;
+    this.speed = 3.7;          // slightly slower
+    this.jumpPower = 13.5;
+    this.score = 0;
+    this.side = side;
+    this.isBot = isBot;
+    this.color = color;
+    this.lastHitFrame = {};
+    this.wasGrounded = true;
+    this.stamina = 100;
+    this.maxStamina = 100;
+    this.netHangFrames = 0;
+    this.netInteractCount = 0;
+    this.netInteractWindowStart = -999;
+    this.netInteractCooldown = 0;
+    this.diveTimer = 0;
+    this.diveDir = 1;
+    this.diveCooldown = 0;
+    this.postDiveStun = 0;
+    this.diveCooldown = 0;
+    this.postDiveStun = 0;
+    this.sprinting = false;
+
+    // Bot tuning: keep speed up but avoid floaty hang time
+    if (this.isBot) {
+      this.speed = 4.25;
+      this.jumpPower = 13.4;
+    }
+  }
+
+  resetPosition() {
+    this.x = this.startX;
+    this.y = groundY;
+    this.vy = 0;
+    this.lastHitFrame = {};
+    this.wasGrounded = true;
+    this.stamina = this.maxStamina;
+    this.netHangFrames = 0;
+    this.netInteractCount = 0;
+    this.netInteractWindowStart = -999;
+    this.netInteractCooldown = 0;
+  }
+
+  isGrounded() {
+    return this.y >= groundY - 0.1;
+  }
+
+  update(leftKey, rightKey, jumpKey) {
+    const prevX = this.x;
+    const wasGrounded = this.wasGrounded;
+    let speedMod = 1;
+    let jumpMod = 1;
+    this.sprinting = false;
+
+    if (this.netInteractCooldown > 0) {
+      this.netInteractCooldown -= 1;
+    }
+
+    if (!this.isBot) {
+      if (this.diveCooldown > 0) this.diveCooldown -= 1;
+      if (this.postDiveStun > 0) this.postDiveStun -= 1;
+      const isSprinting = keys["shift"] && this.stamina > 0;
+
+      if (isSprinting) {
+        // Holding Shift = faster movement + slightly higher jump, drains stamina
+        speedMod = 1.35;   // 35% faster movement
+        jumpMod = 1.08;    // 8% higher jump
+        this.sprinting = true;
+
+        const drain = this.isGrounded() ? 0.32 : 0.42;
+        this.stamina = Math.max(0, this.stamina - drain);
+      } else {
+        // Recharge only when not sprinting (air or ground)
+        const regenRate = 0.32;
+        this.stamina = Math.min(this.maxStamina, this.stamina + regenRate);
+      }
+    }
+
+    if (!this.isBot) {
+
+        // Horizontal movement
+        const stunned = this.postDiveStun > 0;
+
+        if (!stunned) {
+          if (keys[leftKey]) {
+              this.x -= this.speed * speedMod;
+          } 
+          if (keys[rightKey]) {
+              this.x += this.speed * speedMod;
+          }
+        }
+
+        // Dive trigger (F) when grounded or very low
+        if ((keys["f"] || keys[" "] === "f") && this.diveTimer <= 0 && this.diveCooldown <= 0 && this.postDiveStun <= 0 && this.y >= groundY - 6 && this.stamina >= 55) {
+          const dir = keys[leftKey] ? -1 : (keys[rightKey] ? 1 : (this.side === "left" ? 1 : -1));
+          this.diveDir = dir;
+          this.diveTimer = 16;
+          this.diveCooldown = 22; // heavier spam lockout
+          this.stamina = Math.max(0, this.stamina - 55);
+          this.vy = Math.min(this.vy, -2.5);
+          this.lastHitFrame["dive"] = frameCount;
+        }
+
+        // Jump (W or Space) – still only when grounded and not diving
+        const jumpPressed = keys[jumpKey] || keys[" "];
+        if (jumpPressed && this.isGrounded() && this.diveTimer <= 0 && this.postDiveStun <= 0) {
+          this.vy = -this.jumpPower * jumpMod;
+        }
+    }
+
+
+
+    // Dive slide
+    const prevDive = this.diveTimer;
+    if (this.diveTimer > 0) {
+      const slideScale = (this.diveTimer / 16);
+      this.x += this.diveDir * this.speed * 1.6 * slideScale;
+      this.diveTimer -= 1;
+    }
+
+    this.vy += gravity;
+    this.y += this.vy;
+
+    // Post-dive stun when landing from a dive
+    if (prevDive > 0 && this.diveTimer <= 0 && this.postDiveStun <= 0) {
+      this.postDiveStun = 16;
+    }
+
+    if (this.y > groundY) {
+      this.y = groundY;
+      if (!wasGrounded && this.vy > 6) {
+        const cx = this.x + this.w / 2;
+        spawnDust(cx, groundY + this.h - 6, this.vx || 0);
+        playSound("land");
+      }
+      this.vy = 0;
+      this.wasGrounded = true;
+    } else {
+      this.wasGrounded = false;
+    }
+
+    // Side clamps
+    const netBand = 20;
+    if (this.side === "left") {
+      const nearNet = (this.x + this.w) > netLeft - netBand;
+      this.netHangFrames = nearNet ? this.netHangFrames + 1 : 0;
+      if (nearNet && this.netHangFrames > 24) {
+        const push = 0.25 + Math.min(0.6, (this.netHangFrames - 24) * 0.02);
+        this.x = Math.max(0, this.x - push);
+      }
+      this.x = Math.min(this.x, netLeft - this.w);
+    }
+    if (this.side === "right") {
+      const nearNet = this.x < netRight + netBand;
+      this.netHangFrames = nearNet ? this.netHangFrames + 1 : 0;
+      if (nearNet && this.netHangFrames > 24) {
+        const push = 0.25 + Math.min(0.6, (this.netHangFrames - 24) * 0.02);
+        this.x = Math.min(canvas.width - this.w, this.x + push);
+      }
+      this.x = Math.max(this.x, netRight);
+    }
+
+    // Screen clamp
+    this.x = Math.max(0, Math.min(this.x, canvas.width - this.w));
+
+    // Track horizontal velocity for animation/state cues
+    this.vx = this.x - prevX;
+  }
+
+  draw() {
+    ctx.save();
+
+    // Ground shadow
+    const shadowX = this.x + this.w / 2;
+    const shadowY = groundY + this.h + 14; // slightly below feet on the sand
+    const shadowRadX = 32;
+    const shadowRadY = 8;
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(shadowX, shadowY, shadowRadX, shadowRadY, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // squash/stretch based on vertical speed
+    let stretch = Math.min(Math.max(this.vy * -0.03, -0.2), 0.25);
+
+    // Animation state flags
+    const recent = (t, window = 14) => frameCount - ((this.lastHitFrame && this.lastHitFrame[t]) || -999) <= window;
+    const horizontalSpeed = this.vx || 0;
+    const moving = Math.abs(horizontalSpeed) > 0.5;
+    const grounded = this.isGrounded();
+    const diving = this.diveTimer > 0 || recent("dive", 18);
+    const jumping = !grounded && this.vy < -2 && !diving;
+    const falling = !grounded && this.vy > 1 && !diving;
+    const stunned = this.postDiveStun > 0;
+    const sideDir = this.side === "left" ? 1 : -1;
+    const spikePose = recent("spike", 18);
+    const setPose = !spikePose && recent("set", 18);
+    const feintPose = !spikePose && recent("feint", 18);
+    const receivePose = !spikePose && !feintPose && recent("receive", 14);
+    const isWinner = gameOver && ((this.side === "left" ? p1.score > p2.score : p2.score > p1.score));
+    const isLoser = gameOver && !isWinner;
+
+    // lean when moving (player only) or state-driven
+    let lean = 0;
+    if (!this.isBot) {
+      if (diving) {
+        lean = this.diveDir > 0 ? 0.8 : -0.8;
+        stretch = 0.05;
+      } else if (stunned) {
+        lean = 0;
+      } else if (spikePose) {
+        lean = sideDir > 0 ? 0.22 : -0.22;
+      } else if (setPose) {
+        lean = 0.05 * sideDir;
+      } else if (feintPose || receivePose) {
+        lean = sideDir * 0.05;
+      } else if (jumping) {
+        lean = sideDir * 0.06;
+      } else if (moving) {
+        lean = Math.sign(horizontalSpeed) * 0.12;
+      }
+    }
+
+    if (isWinner) {
+      lean = sideDir * 0.1;
+      stretch = -0.08;
+    } else if (isLoser) {
+      lean = sideDir * -0.08;
+      stretch = 0.12;
+    }
+
+  
+      // --- Tame extreme downward speed so hits aren’t a 1-frame window ---
+      if (this.vy > 12) {
+        this.vy *= 0.985; // slight damping
+      }
+    ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+    ctx.rotate(lean);
+    ctx.scale(1 + stretch, 1 - stretch);
+    ctx.translate(-(this.x + this.w / 2), -(this.y + this.h / 2));
+
+    // Sprite-like drawing (head, body, limbs)
+    const headRadius = 12;
+    const headX = this.x + this.w / 2;
+    const headY = this.y + 10;
+
+    // Body gradient + accents
+    const bodyGrad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.h);
+    bodyGrad.addColorStop(0, this.color);
+    bodyGrad.addColorStop(0.5, "#1a2a44");
+    bodyGrad.addColorStop(1, "#0e1624");
+    ctx.fillStyle = bodyGrad;
+    ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.lineWidth = 2;
+    ctx.fillRect(this.x + 8, this.y + 20, this.w - 16, this.h - 25);
+    ctx.strokeRect(this.x + 8, this.y + 20, this.w - 16, this.h - 25);
+
+    // Jersey stripe
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fillRect(this.x + 10, this.y + 26, this.w - 20, 8);
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fillRect(this.x + 10, this.y + 46, this.w - 20, 5);
+
+    // Head with subtle shading
+    const headGrad = ctx.createRadialGradient(headX - 4, headY - 4, 3, headX, headY, headRadius + 3);
+    headGrad.addColorStop(0, "#ffe6c8");
+    headGrad.addColorStop(1, "#eec093");
+    ctx.beginPath();
+    ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+    ctx.fillStyle = headGrad;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.25)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Eyes
+    ctx.fillStyle = "#0b0b0b";
+    ctx.fillRect(headX - 5, headY - 3, 2, 2);
+    ctx.fillRect(headX + 3, headY - 3, 2, 2);
+
+    // Limb helpers for simple pose animation with joints
+    const mirror = (ang) => sideDir > 0 ? ang : Math.PI - ang; // mirror around vertical for right-side
+    const limbEnd = (sx, sy, angle, len) => ({ x: sx + Math.cos(angle) * len, y: sy + Math.sin(angle) * len });
+    const limbChain = (sx, sy, angle, bend, upper, lower) => {
+      const knee = limbEnd(sx, sy, angle, upper);
+      const foot = limbEnd(knee.x, knee.y, angle + bend, lower);
+      return { knee, foot };
+    };
+
+    // Pose selection
+    const runCycle = grounded && moving ? Math.sin(frameCount * 0.25 + (sideDir > 0 ? 0 : Math.PI)) : 0;
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const spikeAge = frameCount - ((this.lastHitFrame && this.lastHitFrame["spike"]) || -999);
+    const spikePhase = Math.max(0, Math.min(1, spikeAge / 10)); // 0 wind-up, 1 follow-through
+    const feintAge = frameCount - ((this.lastHitFrame && this.lastHitFrame["feint"]) || -999);
+    const feintPhase = Math.max(0, Math.min(1, feintAge / 10));
+
+    // Simple aim toward ball for front arm (spike/feint/jump)
+    const aimAtBall = () => {
+      const bx = ball.x;
+      const by = ball.y;
+      const ax = headX;
+      const ay = headY;
+      const ang = Math.atan2(by - ay, bx - ax);
+      return mirror(ang);
+    };
+    const platformOffset = 0; // hands meet for platform
+
+    // Arms angles
+    let frontArmAng, backArmAng, frontArmBend = 0.35, backArmBend = 0.35;
+    if (isWinner) {
+      frontArmAng = mirror(-1.2);
+      backArmAng = mirror(-1.6);
+      frontArmBend = backArmBend = 0.5;
+    } else if (isLoser) {
+      frontArmAng = mirror(1.4);
+      backArmAng = mirror(1.6);
+      frontArmBend = backArmBend = 0.25;
+    } else if (diving) {
+      frontArmAng = this.diveDir > 0 ? 0.05 : Math.PI - 0.05;
+      backArmAng = frontArmAng;
+      frontArmBend = backArmBend = 0.1;
+    } else if (spikePose) {
+      // Front arm aims at ball; back arm full wind-up behind head
+      const aim = aimAtBall();
+      const backWindUp = mirror(-2.7); // overhead, behind head
+      const backContact = mirror(0.35);
+      frontArmAng = aim;
+      backArmAng = lerp(backWindUp, backContact, spikePhase);
+      frontArmBend = lerp(0.6, 0.22, spikePhase);
+      backArmBend = lerp(0.75, 0.28, spikePhase); // more exaggerated back arm
+    } else if (setPose) {
+      // Hands above with bent elbows
+      frontArmAng = mirror(-1.35);
+      backArmAng = mirror(-1.1);
+      frontArmBend = backArmBend = 0.75;
+    } else if (feintPose) {
+      // Front arm aims softly toward ball; back arm cocks then follows
+      const aim = aimAtBall();
+      const backStart = mirror(-2.0); // overhead cock
+      const backEnd = mirror(0.6);    // push forward, not a swing
+      frontArmAng = aim;
+      backArmAng = lerp(backStart, backEnd, feintPhase);
+      frontArmBend = lerp(0.35, 0.22, feintPhase);
+      backArmBend = lerp(0.48, 0.3, feintPhase);
+    } else if (receivePose || (diving && grounded)) {
+      // Platform: forearms meet; on dive keep low bend
+      const platformAng = mirror(0.28);
+      frontArmAng = platformAng;
+      backArmAng = platformAng + platformOffset;
+      frontArmBend = backArmBend = diving ? 0.08 : 0.05;
+    } else if (jumping) {
+      // Ready-to-spike air pose: front arm aims, back arm held overhead
+      const aim = aimAtBall();
+      frontArmAng = aim;
+      backArmAng = mirror(-2.4);
+      frontArmBend = 0.5;
+      backArmBend = 0.6;
+    } else if (falling) {
+      frontArmAng = mirror(-0.2);
+      backArmAng = mirror(0.8);
+      frontArmBend = backArmBend = 0.28;
+    } else if (moving && grounded) {
+      // Exaggerated counter-swing front/back (front arm leads toward net)
+      frontArmAng = mirror(0.2 - runCycle * 0.9);
+      backArmAng = mirror(1.6 + runCycle * 0.9);
+      frontArmBend = backArmBend = 0.28;
+    } else {
+      frontArmAng = mirror(0.35);
+      backArmAng = mirror(0.9);
+      frontArmBend = backArmBend = 0.25;
+    }
+
+    // Legs angles
+    let frontLegAng, backLegAng, frontLegBend = 0.4, backLegBend = 0.4;
+    if (isWinner) {
+      const bounce = Math.sin(frameCount * 0.3) * 0.1;
+      frontLegAng = mirror(1.0 + bounce);
+      backLegAng = mirror(1.0 - bounce);
+      frontLegBend = backLegBend = 0.45;
+    } else if (isLoser) {
+      frontLegAng = mirror(1.55);
+      backLegAng = mirror(1.6);
+      frontLegBend = backLegBend = 0.35;
+    } else if (diving) {
+      frontLegAng = mirror(1.3);
+      backLegAng = mirror(1.45);
+      frontLegBend = backLegBend = 0.25;
+    } else if (spikePose) {
+      // Trail legs backward relative to facing
+      frontLegAng = mirror(1.05);
+      backLegAng = mirror(1.75);
+      frontLegBend = 0.35;
+      backLegBend = 0.55;
+    } else if (setPose) {
+      frontLegAng = mirror(1.2);
+      backLegAng = mirror(1.25);
+      frontLegBend = backLegBend = 0.4;
+    } else if (feintPose || receivePose) {
+      frontLegAng = mirror(1.35);
+      backLegAng = mirror(1.65);
+      frontLegBend = backLegBend = 0.32;
+    } else if (jumping) {
+      frontLegAng = mirror(0.95);
+      backLegAng = mirror(1.6);
+      frontLegBend = 0.35;
+      backLegBend = 0.5;
+    } else if (falling) {
+      frontLegAng = mirror(1.35);
+      backLegAng = mirror(1.6);
+      frontLegBend = backLegBend = 0.28;
+    } else if (moving && grounded) {
+      frontLegAng = mirror(1.2 - runCycle * 0.35);
+      backLegAng = mirror(1.2 + runCycle * 0.35);
+      frontLegBend = backLegBend = 0.35;
+    } else {
+      // Neutral stance: legs mostly vertical
+      frontLegAng = mirror(1.55);
+      backLegAng = mirror(1.62);
+      frontLegBend = backLegBend = 0.3;
+    }
+
+    const leftShoulder = { x: this.x + 10, y: this.y + 38 };
+    const rightShoulder = { x: this.x + this.w - 10, y: this.y + 38 };
+    const leftHip = { x: this.x + 12, y: this.y + this.h - 6 };
+    const rightHip = { x: this.x + this.w - 12, y: this.y + this.h - 6 };
+    const upperArm = 17;
+    const lowerArm = 12;
+    const thighLen = 17;
+    const shinLen = 14;
+
+    const frontHip = sideDir > 0 ? rightHip : leftHip;
+    const backHip = sideDir > 0 ? leftHip : rightHip;
+
+    // Precompute front/back shoulder order by side (front is toward net)
+    const frontShoulder = sideDir > 0 ? rightShoulder : leftShoulder;
+    const backShoulder = sideDir > 0 ? leftShoulder : rightShoulder;
+
+    const frontArm = limbChain(frontShoulder.x, frontShoulder.y, frontArmAng, frontArmBend, upperArm, lowerArm);
+    const backArm = limbChain(backShoulder.x, backShoulder.y, backArmAng, backArmBend, upperArm, lowerArm);
+    const frontLeg = limbChain(frontHip.x, frontHip.y, frontLegAng, frontLegBend, thighLen, shinLen);
+    const backLeg = limbChain(backHip.x, backHip.y, backLegAng, backLegBend, thighLen, shinLen);
+
+    // Legs with shadow
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(frontHip.x, frontHip.y);
+    ctx.lineTo(frontLeg.knee.x, frontLeg.knee.y);
+    ctx.moveTo(frontLeg.knee.x, frontLeg.knee.y);
+    ctx.lineTo(frontLeg.foot.x, frontLeg.foot.y);
+    ctx.moveTo(backHip.x, backHip.y);
+    ctx.lineTo(backLeg.knee.x, backLeg.knee.y);
+    ctx.moveTo(backLeg.knee.x, backLeg.knee.y);
+    ctx.lineTo(backLeg.foot.x, backLeg.foot.y);
+    ctx.stroke();
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(frontHip.x, frontHip.y);
+    ctx.lineTo(frontLeg.knee.x, frontLeg.knee.y);
+    ctx.moveTo(frontLeg.knee.x, frontLeg.knee.y);
+    ctx.lineTo(frontLeg.foot.x, frontLeg.foot.y);
+    ctx.moveTo(backHip.x, backHip.y);
+    ctx.lineTo(backLeg.knee.x, backLeg.knee.y);
+    ctx.moveTo(backLeg.knee.x, backLeg.knee.y);
+    ctx.lineTo(backLeg.foot.x, backLeg.foot.y);
+    ctx.stroke();
+
+    // Arms
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(frontShoulder.x, frontShoulder.y);
+    ctx.lineTo(frontArm.knee.x, frontArm.knee.y);
+    ctx.moveTo(frontArm.knee.x, frontArm.knee.y);
+    ctx.lineTo(frontArm.foot.x, frontArm.foot.y);
+    ctx.moveTo(backShoulder.x, backShoulder.y);
+    ctx.lineTo(backArm.knee.x, backArm.knee.y);
+    ctx.moveTo(backArm.knee.x, backArm.knee.y);
+    ctx.lineTo(backArm.foot.x, backArm.foot.y);
+    ctx.stroke();
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(frontShoulder.x, frontShoulder.y);
+    ctx.lineTo(frontArm.knee.x, frontArm.knee.y);
+    ctx.moveTo(frontArm.knee.x, frontArm.knee.y);
+    ctx.lineTo(frontArm.foot.x, frontArm.foot.y);
+    ctx.moveTo(backShoulder.x, backShoulder.y);
+    ctx.lineTo(backArm.knee.x, backArm.knee.y);
+    ctx.moveTo(backArm.knee.x, backArm.knee.y);
+    ctx.lineTo(backArm.foot.x, backArm.foot.y);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+// ================== Ball Class (FIXED SPIKE + FEINTS) ==================
+class Ball {
+  constructor() {
+    this.spin = 0;
+    this.spinAngle = 0;
+    this.superArmorUntilFrame = -1;
+    this.lastInteractFrame = -999;
+    this.spikeCharge = { left: 0, right: 0 };
+  this.reset();
+this.hitUsed = {
+    left: { receive: false, set: false, spike: false },
+    right: { receive: false, set: false, spike: false }
+};
+
+  }
+
+
+
+  reset() {
+    const dir = serveFromLeft ? 1 : -1;
+    // Serve variety: slight random angle/height per rally
+    const angleJitter = (Math.random() * 0.4 - 0.2); // -0.2..0.2 radians approx small
+    const baseSpeed = 3.1 + Math.random() * 0.8; // 3.1 - 3.9
+    const baseVy = -8 + (Math.random() * 1.6 - 0.8); // -8.8..-7.2
+
+    this.x = serveFromLeft ? 150 : 750;
+    this.y = 170 + Math.random() * 14 - 7; // slight toss height variance
+
+    const cosA = Math.cos(angleJitter);
+    const sinA = Math.sin(angleJitter);
+    this.vx = dir * baseSpeed * cosA;
+    this.vy = baseVy - Math.abs(baseSpeed * sinA) * 0.4;
+
+    // Initialize previous position for swept collisions
+    this.prevX = this.x;
+    this.prevY = this.y;
+
+    this.r = 15;
+    this.leftTouches = 0;
+    this.rightTouches = 0;
+    this.lastTouchedSide = null;
+    this.spin = 0;
+    this.spinAngle = 0;
+    this.superArmorUntilFrame = -1;
+    this.lastInteractFrame = -999;
+    this.rallyHits = 0; // counts successful contacts this rally for speed ramp
+  this.hitState = null; // clear hit memory to avoid stale anti-hit after points
+
+    // New serve reaction delay for bot on serve receive
+    botServeDelayFrames = 2 + Math.floor(Math.random() * 3); // 2-4 frames
+
+    serveFromLeft = !serveFromLeft;
+  }
+
+  update() {
+    // Store previous position for swept collisions (net)
+    this.prevX = this.x;
+    this.prevY = this.y;
+
+    this.vy += gravity;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    this.vx *= 0.995;
+    this.vy *= 0.995;
+
+    // --- Ceiling cushion (soft stop) ---
+    const ceiling = this.r;
+    if (this.y < ceiling) {
+      this.y = ceiling;
+      this.vy = Math.max(this.vy, 0);
+      this.vx *= 0.97;
+      this.spin *= 0.8;
+    }
+
+    // --- Extra slow zone near top to give more hang time ---
+    if (this.y < 60) {
+      this.vy *= 0.9;
+      this.vx *= 0.995;
+    } else if (this.y < 150 && this.vy > 0) {
+      this.vy *= 0.96;
+    }
+
+    // --- Tame extreme downward speed so hits aren’t a 1-frame window ---
+    if (this.vy > 11) {
+      this.vy *= 0.982;
+    }
+
+    const rallyBoost = 1 + Math.min(0.25, (this.rallyHits || 0) * 0.012);
+    const maxSpeed = 16 * rallyBoost;
+    const speed = Math.hypot(this.vx, this.vy);
+    if (speed > maxSpeed) {
+      const s = maxSpeed / speed;
+      this.vx *= s;
+      this.vy *= s;
+    }
+
+    // trailing glow following the ball motion
+    spawnTrail(this.x, this.y, this.vx, this.vy);
+
+    const wallBounce = 0.7;
+    if (this.x < this.r) {
+      this.x = this.r;
+      this.vx *= -wallBounce;
+    }
+    if (this.x > canvas.width - this.r) {
+      this.x = canvas.width - this.r;
+      this.vx *= -wallBounce;
+    }
+
+    // =========================
+    // NET COLLISION (SWEPT + TOP TAPE)
+    // Prevents tunneling through net
+    // =========================
+
+    // Detect crossing between previous and current X
+    const crossedFromLeft = (this.prevX + this.r <= netLeft) && (this.x + this.r >= netLeft);
+    const crossedFromRight = (this.prevX - this.r >= netRight) && (this.x - this.r <= netRight);
+    const withinNetHeight = this.y + this.r > netTop && this.y - this.r < netBottom;
+    const crossedBottom = (this.prevY - this.r <= netBottom) && (this.y - this.r >= netBottom) && (this.x + this.r > netLeft && this.x - this.r < netRight);
+
+    if (crossedBottom && this.vy > 0) {
+      // Hit the bottom of the net: push back up and dampen
+      this.y = netBottom - this.r;
+      this.vy = -Math.max(2.5, Math.abs(this.vy) * 0.5);
+      this.vx *= 0.9;
+      spawnBurst(this.x, netBottom - 6, { color: "rgba(255,255,255,0.6)", count: 8, spread: 1.2, speed: 2.4, gravity: 0.18, size: 3 });
+      playSound("net");
+    } else if (withinNetHeight && (crossedFromLeft || crossedFromRight)) {
+      // Position ball flush against the net and reflect
+      if (crossedFromLeft) {
+        this.x = netLeft - this.r;
+      } else {
+        this.x = netRight + this.r;
+      }
+      this.vx = -Math.sign(this.vx || (crossedFromLeft ? 1 : -1)) * Math.max(2.2, Math.abs(this.vx) * 0.65);
+      this.vy *= 0.92;
+      spawnBurst(this.x, this.y, { color: "rgba(255,255,255,0.55)", count: 10, spread: 1.5, speed: 2.8, gravity: 0.2, size: 3 });
+      playSound("net");
+    } else {
+      // Top tape collision
+      if (this.y + this.r > netTop - 5 && this.y - this.r < netTop + 5 && this.x + this.r > netLeft && this.x - this.r < netRight) {
+        this.y = netTop - this.r;
+        const lastSide = this.lastTouchedSide;
+        const sidePush = lastSide === "left" ? 1 : (lastSide === "right" ? -1 : (this.x < 450 ? -1 : 1));
+        const minBounce = 3.4;
+        const boostedVy = Math.abs(this.vy) < 2.2 ? 2.2 : Math.abs(this.vy);
+        // Stronger upward + definite lateral push off the tape so it can't linger on the net
+        this.vy = -Math.max(minBounce, boostedVy * 0.65);
+        const baseSide = Math.max(0.8, Math.abs(this.vx));
+        this.vx = baseSide * sidePush * 0.92;
+        if (Math.abs(this.vx) < 0.8) this.vx = 0.8 * sidePush;
+        // Keep touch attribution when netting
+        this.lastTouchedSide = lastSide;
+        spawnBurst(this.x, netTop - 4, { color: "rgba(255,255,255,0.7)", count: 9, spread: 1.3, speed: 2.5, gravity: 0.15, size: 3 });
+        playSound("net");
+      }
+
+      // Static side overlap fallback
+      if (withinNetHeight) {
+        if (this.x + this.r > netLeft && this.x < netLeft) {
+          this.x = netLeft - this.r;
+          this.vx = -Math.abs(this.vx) * 0.7;
+        } else if (this.x - this.r < netRight && this.x > netRight) {
+          this.x = netRight + this.r;
+          this.vx = Math.abs(this.vx) * 0.7;
+        }
+      }
+    }
+
+    if (this.y > 430) {
+      if (this.x < 450) p2.score++;
+      else p1.score++;
+
+      playSound("score");
+      resetPositions();
+      this.reset();
+    }
+
+    this.spin *= 0.99;
+    // Integrate spin for visual rotation; add a subtle auto-spin from ball velocity
+    const autoSpin = Math.sign(this.vx || 1) * (Math.abs(this.vx) + Math.abs(this.vy)) * 0.003;
+    this.spinAngle += this.spin + autoSpin;
+    if (this.spinAngle > Math.PI * 2 || this.spinAngle < -Math.PI * 2) {
+      this.spinAngle %= Math.PI * 2;
+    }
+  }
+
+  static randRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  interact(player, type, extraHitbox = 0) {
+    const sprinting = !!player.sprinting;
+    if (!this.hitState) {
+        this.hitState = {
+            left: { lastType: null, lastFrame: -999, inside: false },
+            right:{ lastType: null, lastFrame: -999, inside: false }
+        };
+    }
+
+    // Tiny global interaction cooldown to avoid same-frame spam
+    if (frameCount - this.lastInteractFrame < 2) return;
+
+    // Super spike armor: ignore opponent touches for a brief window
+    if (frameCount <= this.superArmorUntilFrame && this.lastTouchedSide && player.side !== this.lastTouchedSide) return;
+
+    // Prevent contacting a ball that has fully crossed to the opponent's side
+    if (player.side === "left" && this.x > netRight) return;
+    if (player.side === "right" && this.x < netLeft) return;
+
+    // Prevent contacts when the ball is directly above the net tape
+    if (this.x > netLeft - 2 && this.x < netRight + 2) return;
+
+    // Net camping anti-spam: if player is in the net band and on cooldown, block contact
+    const nearNetBand = 26;
+    const inNetBand = player.side === "left"
+      ? (player.x + player.w) > netLeft - nearNetBand
+      : player.x < netRight + nearNetBand;
+    if (inNetBand && player.netInteractCooldown > 0) return;
+
+    const side = player.side;
+    const state = this.hitState[side];
+
+    const touches = side === "left" ? this.leftTouches : this.rightTouches;
+    if (touches >= 3) return;
+
+    const addCharge = (actionType) => {
+      const key = side === "left" ? "left" : "right";
+      if (!this.spikeCharge) this.spikeCharge = { left: 0, right: 0 };
+      const chargeThreshold = 28; // harder to fill
+      const current = this.spikeCharge[key] || 0;
+
+      // If already super-ready and spiking, consume
+      if (actionType === "spike" && current >= chargeThreshold) {
+        this.spikeCharge[key] = 0;
+        return;
+      }
+
+      let gain = 0.8; // baseline receive
+      if (actionType === "set") {
+        gain = 1.4 + (touches === 1 ? 0.2 : 0); // modest, bonus for clean second-touch set
+      } else if (actionType === "spike") {
+        gain = 2.4 + (touches === 2 ? 0.6 : 0); // fastest, bonus for third-hit finisher
+      } else if (actionType === "dive") {
+        gain = 1.1; // digs are skilled
+      } else if (actionType === "feint") {
+        gain = 1.2; // air feint control is skilled
+      }
+
+      this.spikeCharge[key] = Math.min(chargeThreshold, current + gain);
+    };
+
+    // Track net-side interaction streaks to add cooldowns for camping blocks
+    if (inNetBand) {
+      if (frameCount - player.netInteractWindowStart > 60) {
+        player.netInteractWindowStart = frameCount;
+        player.netInteractCount = 0;
+      }
+      player.netInteractCount += 1;
+      if (player.netInteractCount >= 3) {
+        const extra = player.netInteractCount - 3;
+        player.netInteractCooldown = Math.min(24, 6 + extra * 4);
+      }
+    } else {
+      player.netInteractCount = 0;
+      player.netInteractWindowStart = frameCount;
+    }
+
+  const grounded = player.isGrounded();
+
+    // Align collision to the visual sprite (arms/head extend beyond base rect)
+    let baseX = player.x - 5;       // arms reach out a bit
+    let baseW = player.w + 10;
+    let baseY = player.y - 2;       // include head height
+    let baseH = player.h + 17;      // include leg stretch
+
+    // Dive shrinks height and widens reach to simulate rotated body
+    if (player.diveTimer > 0) {
+      baseY += 14;
+      baseH *= 0.42;   // even flatter
+      baseW *= 1.25;   // closer to sideways body length
+    }
+
+    const px = baseX + baseW / 2;
+    const py = baseY + baseH / 2;
+
+  let airRadius = type === "receive" ? 80 : 64; // slightly tighter base leniency
+  if (type === "receive") {
+    if (player.isBot) {
+      airRadius *= 1.2; // keep bot cushion
+    } else {
+      airRadius *= 0.85; // further nerf human receive bubble
+    }
+  }
+
+  if (player.diveTimer > 0) {
+    airRadius *= 1.25; // bigger horizontal cushion for digs
+  }
+
+  // Extra cushion when the ball is screaming downward (hard hit) so hits still register
+  if (this.vy > 5.5) {
+    airRadius *= 1.3;
+  }
+  if (this.vy > 8.5) {
+    airRadius *= 1.1;
+  }
+    const airHit = distance(this.x, this.y, px, py) < airRadius;
+
+    /* ================= REAL HITBOX ================= */
+  let padX = 12.5 + extraHitbox;
+  let padY = 18 + extraHitbox; // trim vertical reach
+
+  if (player.diveTimer > 0) {
+    padX *= 1.25; // moderate horizontal reach aligned to sideways body
+    padY *= 0.5;  // low vertical reach
+  }
+
+  // Receives get extra forgiveness for cleaner pickups
+  if (type === "receive") {
+    const rxScale = player.isBot ? 1.1 : 1.02; // big nerf to human receive width
+    const ryScale = player.isBot ? 1.1 : 1.02; // further reduced vertical help for humans
+    padX *= rxScale;
+    padY *= ryScale;
+
+    // Fast-fall safety net for everyone
+    if (this.vy > 5.5) {
+      padX *= 1.2;
+      padY *= 1.2;
+    }
+    if (this.vy > 8.5) {
+      padX *= 1.12;
+      padY *= 1.12;
+      airRadius += 10;
+    }
+  }
+
+  if (!player.isBot) {
+    // Human hitbox close to model; receive only modestly larger (~1.2-1.35x vs base)
+    const receiveScaleX = 0.60;
+    const receiveScaleY = 0.72;
+    const generalScaleX = 0.62;
+    const generalScaleY = 0.68;
+    const useReceive = (type === "receive");
+    padX *= useReceive ? receiveScaleX : generalScaleX;
+    padY *= useReceive ? receiveScaleY : generalScaleY;
+  } else {
+    padX *= 1.2;
+    padY *= 1.2;
+
+    // Give the bot extra horizontal reach on spikes to avoid whiffing after tighter receives
+    if (type === "spike") {
+      padX *= 1.6;  // stronger horizontal reach
+      padY *= 1.3;  // more vertical clearance
+    }
+  }
+
+    // Hard-to-hit high balls: give extra reach mid-air so jump contacts register
+    const highBall = this.y < 230;
+    if (!grounded && highBall) {
+      if (player.isBot) {
+        padX *= 1.3;
+        padY *= 1.28;
+      } else {
+        padX *= 1.08; // modest boost for humans
+        padY *= 1.08;
+      }
+      airRadius += 14;
+    }
+
+    // Grounded high-ball help: widen box and allow air assist when ball is way up
+    if (grounded && highBall) {
+      if (player.isBot) {
+        padX *= 1.32;
+        padY *= 1.28;
+      } else {
+        padX *= 1.08; // modest boost for humans
+        padY *= 1.06;
+      }
+      airRadius += 12;
+    }
+
+  const rectHit =
+    this.x + this.r > baseX - padX &&
+    this.x - this.r < baseX + baseW + padX &&
+    this.y + this.r > baseY - padY &&
+    this.y - this.r < baseY + baseH + padY;
+
+  // When grounded on a high ball, also allow the air bubble to count
+  let hit = grounded ? (rectHit || (highBall && airHit)) : (rectHit || airHit);
+
+  // 🛡️ Swept fallback: if we moved past the player between frames, still count it
+  if (!hit) {
+  const rx0 = baseX - padX;
+  const rx1 = baseX + baseW + padX;
+  const ry0 = baseY - padY;
+  const ry1 = baseY + baseH + padY;
+
+    const segMinX = Math.min(this.prevX, this.x) - this.r;
+    const segMaxX = Math.max(this.prevX, this.x) + this.r;
+    const segMinY = Math.min(this.prevY, this.y) - this.r;
+    const segMaxY = Math.max(this.prevY, this.y) + this.r;
+
+    if (segMaxX > rx0 && segMinX < rx1 && segMaxY > ry0 && segMinY < ry1) {
+      hit = true;
+    }
+  }
+
+    /* ================= ANTI DOUBLE-HIT HITBOX ================= */
+// Smaller on purpose so legit hits aren't blocked
+let antiPadX = padX * 0.6;
+let antiPadY = padY * 0.6;
+
+// 🔒 Bots get slightly tighter anti-hitbox
+if (player.isBot) {
+  antiPadX *= 0.9; // a bit looser to let legit contacts register
+  antiPadY *= 0.9;
+}
+
+// When ball is falling very fast, relax anti-hitbox slightly so contacts aren't filtered out
+if (this.vy > 5.5) {
+  antiPadX *= 0.97;
+  antiPadY *= 0.97;
+}
+if (this.vy > 8.5) {
+  antiPadX *= 0.99;
+  antiPadY *= 0.99;
+}
+// When grounded and high, slightly loosen anti-hit for humans
+if (grounded && highBall && !player.isBot) {
+  antiPadX *= 1.04;
+  antiPadY *= 1.04;
+}
+
+const antiHit =
+  this.x + this.r > baseX - antiPadX &&
+  this.x - this.r < baseX + baseW + antiPadX &&
+  this.y + this.r > baseY - antiPadY &&
+  this.y - this.r < baseY + baseH + antiPadY;
+
+/* ================= RESET WHEN BALL LEAVES ================= */
+if (!antiHit) {
+    state.inside = false;
+    state.lastType = null;
+    return;
+}
+
+if (!hit) return;
+
+/* ================= DOUBLE HIT PREVENTION ================= */
+const now = frameCount;
+
+// 🔒 Bots get longer linger lockout
+const frameDelay = player.isBot ? 10 : 9;
+
+if (
+    state.inside &&
+    state.lastType === type &&
+    now - state.lastFrame < frameDelay
+) {
+    return; // blocked same-type linger hit
+}
+
+/* ================= REGISTER HIT ================= */
+state.inside = true;
+state.lastType = type;
+state.lastFrame = now;
+
+// Reset opposing side's linger so new rallies don't get blocked
+const otherSide = side === "left" ? "right" : "left";
+if (this.hitState[otherSide]) {
+  this.hitState[otherSide].inside = false;
+  this.hitState[otherSide].lastType = null;
+  this.hitState[otherSide].lastFrame = -999;
+}
+
+// 🌀 Possession change: reset the old side's touch count and set buff
+const prevSide = this.lastTouchedSide;
+if (prevSide && prevSide !== side) {
+  if (side === "left") this.rightTouches = 0;
+  else this.leftTouches = 0;
+
+  // Clear any lingering set buff when rally switches sides
+  this.lastTouchType = null;
+  this.setBuffUntilFrame = -1;
+}
+
+
+    // ---- APPLY HIT LOGIC BELOW THIS LINE ----
+
+
+
+
+
+    // From here down, your original logic stays the same:
+    this.vx *= 0.35;
+    this.vy *= 0.35;
+
+    const dir = player.side === "left" ? 1 : -1;
+    const isThirdHit = touches === 2;
+
+    // ... rest of your receive / set / spike code unchanged ...
+
+
+// =========================
+// MID-AIR RECEIVE = FEINT (GUARANTEED NET CLEAR)
+// =========================
+if (type === "receive" && !grounded) {
+
+    // Reduce old speed but keep some momentum
+    this.vx *= 0.75;
+    this.vy *= 0.75;
+
+    // Strong forward push so it actually reaches the net
+    this.vx += dir * 4;
+
+    // Upward push to clear the net
+    // If ball is low, push harder
+    if (this.y > 300) {
+        this.vy = -14;   // very low → strong lift
+    } else if (this.y > 260) {
+        this.vy = -10;    // near net height → moderate lift
+    } else {
+        this.vy = -6;    // above net → gentle lift
+    }
+
+    // Add topspin so it drops after crossing
+    this.spin += dir * 0.35;
+
+    // Slight downward bias so it doesn't float forever
+    this.vy += 1.0;
+
+    // --- NET CLEARANCE CORRECTION ---
+    // Predict where the ball will be when crossing the net
+    const netX = player.side === "left" ? 445 : 455;
+    const t = (netX - this.x) / this.vx;
+
+    if (t > 0 && t < 1.2) {
+        const predictedY = this.y + this.vy * t + 0.5 * gravity * t * t;
+
+        // If predicted Y is too low, lift the feint
+        if (predictedY > 250) {
+            this.vy -= (predictedY - 250) * 0.7;
+        }
+    }
+
+  spawnBurst(this.x, this.y, { color: "rgba(130,200,255,0.7)", count: 12, spread: 1.5, speed: 2.9, gravity: 0.22, size: 3 });
+  playSound("feint");
+
+  addCharge("feint");
+
+    if (player.side === "left") this.leftTouches++;
+    else this.rightTouches++;
+
+    this.lastTouchedSide = player.side;
+    player.lastHitFrame[type] = frameCount;
+    player.lastHitFrame["feint"] = frameCount;
+    return;
+}
+
+
+    // =========================
+    // 3RD HIT RECEIVE/SET
+    // =========================
+    if (isThirdHit && (type === "receive" || type === "set")) {
+      const netX = 450;
+      const netDist = Math.abs(this.x - netX);
+      const farFactor = Math.max(0, Math.min(1, (netDist - 110) / 200)); // 0 close, 1 deep back
+
+      // More forward and higher when far/back-row or when the ball is screaming down
+      const fastFallBoost = this.vy > 5 ? 0.6 : 0;
+      // Extra push and lift scale with distance so deep third touches still clear
+      this.vx = dir * (3.8 + 2.2 * farFactor + fastFallBoost);
+      this.vy = -14.8 - 4.2 * farFactor - (this.vy > 5 ? 1.2 : 0);
+      // Minimum forward shove when far back
+      if (farFactor > 0.55) {
+        this.vx += dir * 1.2;
+      }
+      this.vx = Math.max(-8.4, Math.min(8.4, this.vx));
+
+      // Net clearance assist: if predicted net-cross is low, boost upward
+      const t = (netX - this.x) / this.vx;
+      if (t > 0 && t < 1.6) {
+        const predictedY = this.y + this.vy * t + 0.5 * gravity * t * t;
+        if (predictedY > 248) {
+          this.vy -= (predictedY - 248) * 0.8;
+        }
+      }
+
+      this.spin += dir * 0.22;
+  spawnBurst(this.x, this.y, { color: "rgba(255, 226, 150, 0.75)", count: 12, spread: 1.7, speed: 3.2, gravity: 0.25, size: 4 });
+  playSound("set");
+
+      // Mark as a powered set to buff follow-up spike
+      this.lastTouchType = "set";
+      this.setBuffUntilFrame = frameCount + 70; // ~70 frames of buff window
+
+  addCharge("set");
+
+      if (player.side === "left") this.leftTouches++;
+      else this.rightTouches++;
+
+      this.lastTouchedSide = player.side;
+      player.lastHitFrame[type] = frameCount;
+      return;
+    }
+
+    // =========================
+    // NORMAL RECEIVE
+    // =========================
+    if (type === "receive") {
+      // Always pop it up on ground receive (not as high as set)
+      if (player.diveTimer > 0) {
+        // Diving dig: force it over the net with a solid upward pop
+        const netX = player.side === "left" ? 445 : 455;
+        const netDist = Math.abs(this.x - netX);
+        const farFactor = Math.max(0, Math.min(1, (netDist - 90) / 220));
+        this.vy = -12.5 - 3.2 * farFactor;
+        this.vx = (player.side === "left" ? 1 : -1) * (7.2 + 2.2 * farFactor);
+
+        // Predict net clearance and boost if needed
+        const t = (netX - this.x) / this.vx;
+        if (t > 0 && t < 1.6) {
+          const predictedY = this.y + this.vy * t + 0.5 * gravity * t * t;
+          if (predictedY > 248) {
+            this.vy -= (predictedY - 248) * 0.8;
+          }
+        }
+
+        addCharge("dive");
+      } else {
+        this.vy = -8;          // slightly higher
+        this.vx = dir * 1.5;     // more push to compensate tighter width
+        addCharge("receive");
+      }
+      this.spin += dir * 0.12;
+  spawnBurst(this.x, this.y, { color: "rgba(120,200,255,0.7)", count: 10, spread: 1.6, speed: 2.8, gravity: 0.25, size: 3 });
+  playSound("receive");
+
+      if (player.side === "left") this.leftTouches++;
+      else this.rightTouches++;
+
+      this.lastTouchedSide = player.side;
+      this.lastInteractFrame = frameCount;
+      player.lastHitFrame[type] = frameCount;
+      return;
+    }
+
+    // =========================
+    // NORMAL SET (buffs spike, slower fall)
+    // =========================
+    else if (type === "set") {
+      // Base set height (user reset) with modest horizontal push
+      this.vy = -12.0;
+      this.vx = dir * 0.3;
+      this.spin += dir * 0.20;
+
+      // Directional set bias based on player horizontal motion
+      const aimBias = Math.max(-1, Math.min(1, (player.vx || 0) / 2.2));
+      const steer = aimBias * 1.55; // stronger steer
+      this.vx += steer;
+
+      // Keep sets directional but contained (non-third-touch should not drift over)
+      const isThirdHit = touches === 2;
+      const maxVX = isThirdHit ? 6.8 : 4.2;
+      this.vx = Math.max(-maxVX, Math.min(maxVX, this.vx));
+
+      // For non-third touches, cap forward push toward the net
+      if (!isThirdHit) {
+        const towardNet = dir; // left player toward +x, right toward -x
+        if (Math.sign(this.vx || 0) === towardNet) {
+          this.vx = Math.min(Math.abs(this.vx), 3.0) * towardNet;
+        }
+      }
+
+      // Bot-specific softening so its sets stay consistent and not overly floaty
+      if (player.isBot) {
+        this.vy = Math.max(this.vy, -9.0);
+        this.vx *= 0.78;
+      }
+
+      // Mark set buff window for next spike
+      this.lastTouchType = "set";
+      this.setBuffUntilFrame = frameCount + 70;
+
+  spawnBurst(this.x, this.y, { color: "rgba(160, 230, 255, 0.75)", count: 10, spread: 1.5, speed: 3.0, gravity: 0.22, size: 3 });
+  playSound("set");
+
+      addCharge("set");
+    }
+
+// =========================
+// SPIKE (GUARANTEED NO NET CLIPPING)
+// =========================
+else if (type === "spike") {
+
+  const sideKey = player.side === "left" ? "left" : "right";
+  const chargeCount = (this.spikeCharge && this.spikeCharge[sideKey]) || 0;
+  const chargeThreshold = 28; // matches harder super bar fill
+  const isSuperSpike = chargeCount >= chargeThreshold;
+
+    // Kill old speed
+    this.vx *= 0.3;
+    this.vy *= 0.3;
+
+    // --- Distance to net (NEW) ---
+    const netX = 450;
+    const netDist = Math.abs(this.x - netX);
+    const netFactor = Math.min(1, netDist / 260); // 0 near, 1 far
+
+    // --- 1. Choose a target above the net ---
+    let targetX = player.side === "left"
+        ? Ball.randRange(500, 650)
+        : Ball.randRange(250, 400);
+
+    // --- Dynamic spike target height ---
+    let targetY;
+
+  if (this.y > 300) {
+    targetY = 140;
+  } else if (this.y > 260) {
+    targetY = 165;
+  } else {
+    targetY = 188;
+  }
+
+  // Bot aims higher to avoid tape clips after power buffs
+  if (player.isBot) targetY -= 22;
+
+  // 🔺 Aim higher when farther from net (helps back-row clears)
+  targetY += netFactor * 48;
+
+  // When very close to net, flatten trajectory for a sharper angle while keeping clearance
+  if (netDist < 60) {
+    targetY += 32; // aim lower to get a steeper downward spike
+  }
+
+  // Extra lift for deep back-row spikes
+  if (netDist > 160) targetY -= 20;
+  if (netDist > 200) targetY -= 18;
+  if (player.isBot && netDist < 90) targetY -= 8;
+
+    // --- 2. Compute direction vector ---
+    let dx = targetX - this.x;
+    let dy = targetY - this.y;
+
+    if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
+        dx = dir * 1;
+        dy = -1;
+    }
+
+    let dist = Math.max(1, Math.hypot(dx, dy));
+    let nx = dx / dist;
+    let ny = dy / dist;
+
+  // 🔺 Extra upward bias when far (does NOT break normalization)
+  ny -= netFactor * 0.24;
+
+  // Near-tape steepener: stronger upward bias (for clearance) combined with lower target yields sharper angle
+  if (netDist < 60) {
+    ny -= 0.08;
+  }
+
+    // Re-normalize after bias
+    const mag = Math.hypot(nx, ny);
+    nx /= mag;
+    ny /= mag;
+
+    // --- 3. Base spike power ---
+  let spikePower = isThirdHit ? 14 : 12;
+
+  if (sprinting && !player.isBot) {
+    spikePower *= 1.18; // sprinting adds punch
+  }
+
+  // Super spike power boost
+  if (isSuperSpike) {
+    spikePower *= 1.55;
+  }
+
+    const mvx = player.vx || 0;
+    const mvy = player.vy || 0;
+
+    spikePower += Math.abs(mvx) * 0.4;
+    // Bot gets extra upward bias when moving down to avoid tape slams
+    spikePower += Math.max(0, -mvy) * (player.isBot ? 0.5 : 0.3);
+
+    // 🔺 Extra carry when farther from net
+    spikePower += netFactor * 2.0;
+
+  spikePower *= Math.min(1.05, dist / 180); // slightly more carry scaling
+  // Give bot a bit more punch before capping (tempered)
+  if (player.isBot) spikePower *= 1.08;
+  spikePower = Math.min(spikePower, player.isBot ? 17.0 : 15.5);
+
+  // --- 4. Initial spike velocity (buff if set just happened) ---
+  const setBuffActive = this.lastTouchType === "set" && frameCount <= (this.setBuffUntilFrame || -1);
+  let vx = nx * spikePower;
+  let vy = ny * spikePower;
+
+  if (sprinting && !player.isBot) {
+    vx *= 1.06;
+    vy *= 1.04;
+  }
+
+  if (setBuffActive) {
+    // More hang time and slight power boost from a clean set
+    vx *= 1.3;
+    vy *= 1.15;
+    vy *= 0.9; // soften downward to fall a bit slower initially
+    if (player.isBot) {
+      vx *= 1.08;
+      vy *= 1.08;
+    }
+  }
+
+  // Baseline upward bias for bot spikes near the tape to clear more often
+  if (player.isBot && Math.abs(this.x - netX) < 110) {
+    vy -= 0.9;
+    vx *= 0.97;
+  }
+
+  if (isSuperSpike) {
+    vx *= 1.15;
+    vy *= 1.15;
+    this.superArmorUntilFrame = frameCount + 45; // long window where opponents can't stuff it
+  } else {
+    this.superArmorUntilFrame = -1;
+  }
+
+  // Extra bot lift when very close to net to avoid tape
+  if (player.isBot) {
+    const nearNet = Math.abs(this.x - netX) < 70;
+    if (nearNet) {
+      vy -= 3.6;
+      vx *= 0.9;
+    }
+  }
+
+    // --- 5. NET COLLISION PREDICTION ---
+  const netX1 = 445;
+  const netX2 = 455;
+  const netTop = 260;
+  const clearance = player.isBot ? 36 : 12;
+
+    const targetNetX = player.side === "left" ? netX1 : netX2;
+  const t = (targetNetX - this.x) / vx;
+
+  if (t > 0 && t < 1.2) {
+    const predictedY = this.y + vy * t + 0.5 * gravity * t * t;
+
+    if (predictedY > netTop - clearance) {
+    const neededLift = (predictedY - (netTop - clearance)) * (player.isBot ? 1.32 : 1.1);
+    vy -= neededLift;
+
+      // Nudge horizontal slightly down to reduce tape clips when very close
+      vx *= player.isBot ? 0.8 : 0.94;
+
+      const newSpeed = Math.hypot(vx, vy);
+      if (newSpeed > 15.5) {
+        const s = 15.5 / newSpeed;
+        vx *= s;
+        vy *= s;
+      }
+    }
+  }
+
+    // --- 6. Apply final velocity ---
+    this.vx = vx;
+    this.vy = vy;
+
+    this.spin += dir * (isSuperSpike ? 0.8 : 0.45);
+    cameraShake = settings.screenShake ? (isSuperSpike ? 14 : (isThirdHit ? 10 : 7)) : 0;
+  spawnBurst(this.x, this.y, { color: isSuperSpike ? "rgba(255,60,200,0.95)" : "rgba(255,140,105,0.8)", count: isSuperSpike ? 32 : 16, spread: isSuperSpike ? 2.4 : 2.0, speed: isSuperSpike ? 6.0 : 4.2, gravity: 0.28, size: isSuperSpike ? 6 : 4 });
+  if (isSuperSpike) {
+    spawnBurst(this.x, this.y - 20, { color: "rgba(120,200,255,0.7)", count: 18, spread: 1.6, speed: 4.5, gravity: 0.2, size: 4 });
+  }
+  const spikeSpeed = Math.hypot(this.vx, this.vy);
+  if (spikeSpeed > 13) {
+    playSound("whoosh", { intensity: Math.min(1.25, spikeSpeed / 16) });
+  }
+  playSound(isSuperSpike ? "superSpike" : "spike", { intensity: isSuperSpike ? 1.35 : 1 });
+
+  addCharge("spike");
+}
+
+    // Final bookkeeping if we didn't early-return above
+    if (player.side === "left") this.leftTouches++;
+    else this.rightTouches++;
+
+    this.lastTouchedSide = player.side;
+    this.lastInteractFrame = frameCount;
+    player.lastHitFrame[type] = frameCount;
+
+    // Gradual rally speed ramp: boosts after each successful contact, reset each point
+    this.rallyHits = (this.rallyHits || 0) + 1;
+    const rallyBoost = 1 + Math.min(0.25, this.rallyHits * 0.012);
+    this.vx *= rallyBoost;
+    this.vy *= rallyBoost;
+
+  }
+  draw() {
+    ctx.save();
+    // soft ground shadow
+    const shadowScale = Math.max(0.35, Math.min(1, 1 - (this.y - 80) / 320));
+    const shadowX = this.x;
+    const shadowY = groundY + 104; // align with player shadow plane
+    ctx.save();
+    ctx.globalAlpha = 0.35 * shadowScale;
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(shadowX, shadowY, this.r * 1.4 * shadowScale, this.r * 0.55 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.translate(this.x, this.y);
+
+    const shake = settings.screenShake ? cameraShake : 0;
+    if (shake > 0) {
+      const shakeX = (Math.random() * 2 - 1) * shake;
+      const shakeY = (Math.random() * 2 - 1) * shake;
+      ctx.translate(shakeX, shakeY);
+      cameraShake *= 0.9;
+      if (cameraShake < 0.2) cameraShake = 0;
+    }
+
+  ctx.rotate(this.spinAngle);
+
+  // soft glow
+  ctx.shadowColor = "rgba(255,255,255,0.5)";
+  ctx.shadowBlur = 14;
+
+  // base sphere
+  const grad = ctx.createRadialGradient(-6, -8, 2, 0, 0, this.r + 4);
+  grad.addColorStop(0, "#ffffff");
+  grad.addColorStop(0.5, "#eaf1ff");
+  grad.addColorStop(1, "#c7d8ff");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, this.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // panel shading
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, this.r - 2, 0.9, Math.PI + 0.9);
+  ctx.stroke();
+
+  // accent bands
+  ctx.strokeStyle = "#ffcf4a";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, this.r - 3, -0.2, Math.PI - 0.4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, this.r - 5, Math.PI * 0.8, Math.PI * 1.8);
+  ctx.stroke();
+
+  // highlight streak
+  const gloss = ctx.createRadialGradient(-8, -10, 1, -4, -6, 16);
+  gloss.addColorStop(0, "rgba(255,255,255,0.9)");
+  gloss.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gloss;
+  ctx.beginPath();
+  ctx.ellipse(-2, -6, 12, 16, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+
+
+
+// ================== Game Setup ==================
+let serveFromLeft = true;
+const p1 = new Player(150, "left", false, "#1e88e5"); // blue
+const p2 = new Player(710, "right", true, "#e53935"); // red
+function applyBotDifficulty() {
+  const mode = settings.botDifficulty;
+  if (mode === "easy") {
+    p2.speed = 3.9;
+    p2.jumpPower = 13.0;
+  } else if (mode === "hard") {
+    p2.speed = 4.55;
+    p2.jumpPower = 13.9;
+  } else {
+    p2.speed = 4.25;
+    p2.jumpPower = 13.4;
+  }
+}
+applyBotDifficulty();
+const ball = new Ball();
+
+function drawNet() {
+  ctx.save();
+  // Posts
+  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = "#0e2845";
+  ctx.fillRect(440, 250, 6, 190);
+  ctx.fillRect(454, 250, 6, 190);
+
+  // Padding on posts
+  ctx.fillStyle = "#1f4d8b";
+  ctx.fillRect(438, 260, 10, 70);
+  ctx.fillRect(452, 260, 10, 70);
+
+  // Net body
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillRect(445, 260, 10, 170);
+
+  // Top tape and rope
+  const tapeGrad = ctx.createLinearGradient(445, 255, 455, 270);
+  tapeGrad.addColorStop(0, "#ffffff");
+  tapeGrad.addColorStop(1, "#d7e6ff");
+  ctx.fillStyle = tapeGrad;
+  ctx.fillRect(445, 252, 10, 10);
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fillRect(445, 262, 10, 2);
+
+  // Net pattern
+  ctx.strokeStyle = "rgba(255,255,255,0.72)";
+  ctx.lineWidth = 1;
+  for (let y = 270; y < 430; y += 12) {
+    ctx.beginPath();
+    ctx.moveTo(445, y);
+    ctx.lineTo(455, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawScoreboard() {
+  ctx.save();
+  const panelGrad = ctx.createLinearGradient(340, 8, 560, 56);
+  panelGrad.addColorStop(0, "rgba(6,18,34,0.9)");
+  panelGrad.addColorStop(1, "rgba(18,44,78,0.85)");
+  ctx.fillStyle = panelGrad;
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 10;
+  ctx.fillRect(330, 10, 240, 54);
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(330, 10, 240, 54);
+
+  ctx.fillStyle = "#f7fbff";
+  ctx.font = "22px 'Segoe UI', Arial";
+  ctx.fillText("P1: " + p1.score, 346, 42);
+  ctx.fillText("CPU: " + p2.score, 456, 42);
+
+  ctx.font = "12px 'Segoe UI', Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText(`To ${settings.targetScore}`, 450, 58);
+
+  // subtle byline below the scoreboard
+  ctx.font = "12px 'Segoe UI', Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("By Joshua Oh", 450, 70);
+
+  // Muted tag
+  if (masterVolume <= 0) {
+    ctx.font = "12px 'Segoe UI', Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText("Muted", 450, 74);
+  }
+  ctx.restore();
+}
+
+function drawStaminaBar(player) {
+  const isCPU = player.isBot;
+  const width = 220;
+  const height = 16;
+  const padding = 20;
+  const x = isCPU ? canvas.width - width - padding : 20;
+  const y = canvas.height - height - 6;
+
+  const pct = Math.max(0, Math.min(1, player.stamina / player.maxStamina));
+
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+  const barGrad = ctx.createLinearGradient(x, y, x + width, y);
+  barGrad.addColorStop(0, "#6ee7ff");
+  barGrad.addColorStop(1, "#4dd0e1");
+  ctx.fillStyle = barGrad;
+  ctx.fillRect(x, y, width * pct, height);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, width, height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "12px 'Segoe UI', Arial";
+  ctx.fillText(isCPU ? "CPU Stamina" : "Stamina", x, y - 6);
+  ctx.restore();
+}
+
+function drawSuperCharge(player) {
+  const key = player.side === "left" ? "left" : "right";
+  const current = (ball.spikeCharge && ball.spikeCharge[key]) || 0;
+  const threshold = 28;
+  const ready = current >= threshold;
+  const pct = Math.max(0, Math.min(1, current / threshold));
+  const nearReady = pct >= 0.8;
+
+  const isCPU = player.isBot;
+  const width = 200;
+  const height = 10;
+  const padding = 16;
+
+  const x = isCPU ? canvas.width - width - padding : 20;
+  const y = padding;
+
+  ctx.save();
+
+  if (nearReady) {
+    ctx.save();
+    const glowColor = ready ? "rgba(0,255,180,0.4)" : "rgba(255,120,200,0.25)";
+    ctx.fillStyle = glowColor;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = ready ? 20 : 14;
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(x - 8, y - 8, width + 16, height + 16);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+  const barGrad = ctx.createLinearGradient(x, y, x + width, y);
+  barGrad.addColorStop(0, "#ff8ad1");
+  barGrad.addColorStop(1, "#ff5c8a");
+  ctx.fillStyle = barGrad;
+  ctx.fillRect(x, y, width * pct, height);
+
+  ctx.strokeStyle = ready ? "rgba(0,255,180,0.8)" : "rgba(255,255,255,0.6)";
+  ctx.lineWidth = ready ? 2 : 1.5;
+  ctx.strokeRect(x, y, width, height);
+
+  ctx.fillStyle = ready ? "#9cffc7" : "white";
+  ctx.font = "12px 'Segoe UI', Arial";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  const percent = Math.round(pct * 100);
+  const label = ready ? "Super Spike READY" : `Super Spike ${percent}%`;
+  ctx.fillText(label, x, y - 2);
+  ctx.restore();
+}
+
+function drawKeybinds() {
+  ctx.save();
+  const staminaX = 20;
+  const staminaWidth = 220;
+  const y = 520 - 42; // align with stamina bar
+  const x = staminaX + staminaWidth + 20;
+
+  const text = "W/A/D move & jump | Q spike | E set | S receive / feint (air) | F dive | Shift sprint | P/Esc pause | M mute";
+  ctx.font = "12px 'Segoe UI', Arial";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+
+  // subtle strip behind text to keep readability without blocking view
+  const metrics = ctx.measureText(text);
+  const h = 16;
+  const padX = 6;
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillRect(x - padX, y - 2, metrics.width + padX * 2, h + 4);
+
+  ctx.fillStyle = "white";
+  ctx.fillText(text, x, y);
+
+  ctx.restore();
+}
+
+function drawBackground() {
+  const map = maps[settings.mapIndex % maps.length];
+  const isIndoor = !!map.indoor;
+
+  // Sky
+  const sky = ctx.createLinearGradient(0, 0, 0, 320);
+  sky.addColorStop(0, map.sky[0]);
+  sky.addColorStop(0.35, map.sky[1]);
+  sky.addColorStop(1, map.sky[2]);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, 320);
+
+  // Sun + halo (outdoor only)
+  const sunX = 140, sunY = 80;
+  if (!isIndoor && map.sun.alpha > 0) {
+    const sun = ctx.createRadialGradient(sunX, sunY, 14, sunX, sunY, map.sun.radius);
+    sun.addColorStop(0, map.sun.main);
+    sun.addColorStop(0.45, map.sun.halo);
+    sun.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.save();
+    ctx.globalAlpha = map.sun.alpha;
+    ctx.fillStyle = sun;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, map.sun.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Light rays (outdoor only)
+  if (!isIndoor && map.raysAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = map.raysAlpha;
+    ctx.fillStyle = map.sun.halo || "#ffdfa4";
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      const offset = i * 16;
+      ctx.moveTo(sunX - 12 + offset, 0);
+      ctx.lineTo(sunX + 160 + offset, 0);
+      ctx.lineTo(sunX + 60 + offset, 260);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // High clouds (outdoor only)
+  if (!isIndoor) {
+    ctx.fillStyle = map.cloudColor;
+    for (let i = 0; i < 4; i++) {
+      const cx = 200 + i * 190;
+      const cy = 86 + (i % 2) * 14;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 70, 22, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 40, cy + 6, 52, 18, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx - 44, cy + 10, 48, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Horizon glow
+  const horizon = ctx.createLinearGradient(0, 200, 0, 320);
+  horizon.addColorStop(0, map.horizon[0]);
+  horizon.addColorStop(1, map.horizon[1]);
+  ctx.fillStyle = horizon;
+  ctx.fillRect(0, 180, canvas.width, 160);
+
+  // Ocean band
+  const water = ctx.createLinearGradient(0, 220, 0, 270);
+  water.addColorStop(0, map.water[0]);
+  water.addColorStop(1, map.water[1]);
+  ctx.fillStyle = water;
+  ctx.fillRect(0, 220, canvas.width, 70);
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  for (let i = 0; i < canvas.width; i += 90) {
+    ctx.beginPath();
+    ctx.ellipse(i + 30, 260 + Math.sin(i * 0.02) * 3, 60, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Distant crowd band
+  ctx.fillStyle = map.crowdBase;
+  ctx.fillRect(0, 240, canvas.width, 44);
+  ctx.fillStyle = map.crowdAccent;
+  for (let i = 0; i < canvas.width; i += 18) {
+    const h = 14 + (i % 3 === 0 ? 4 : 0);
+    ctx.fillRect(i, 244, 10, h);
+  }
+
+  // Sand + court
+  const sand = ctx.createLinearGradient(0, 260, 0, canvas.height);
+  sand.addColorStop(0, map.sand[0]);
+  sand.addColorStop(1, map.sand[1]);
+  ctx.fillStyle = sand;
+  ctx.fillRect(0, 260, canvas.width, canvas.height - 260);
+
+  // Sand noise bands
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  for (let y = 300; y < canvas.height; y += 22) {
+    ctx.beginPath();
+    for (let x = 0; x <= canvas.width; x += 24) {
+      const wiggle = Math.sin((x + y) * 0.03) * 3 + Math.cos((x - y) * 0.04) * 2;
+      ctx.lineTo(x, y + wiggle);
+    }
+    ctx.stroke();
+  }
+
+  // Court panels
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+  ctx.lineWidth = 2;
+  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowBlur = 4;
+  ctx.strokeRect(40, 300, 380, 160);
+  ctx.strokeRect(480, 300, 380, 160);
+  ctx.setLineDash([7, 7]);
+  ctx.beginPath();
+  ctx.moveTo(450, 300);
+  ctx.lineTo(450, 460);
+  ctx.stroke();
+  ctx.restore();
+
+  // Ground vignette
+  const vignette = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 140, canvas.width / 2, canvas.height / 2, 540);
+  vignette.addColorStop(0.55, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, `rgba(0,0,0,${map.vignetteAlpha})`);
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function resetPositions() {
+  p1.resetPosition();
+  p2.resetPosition();
+  botLastJumpFrame = frameCount;
+  botSpikeIntent = false;
+  // Clear per-bot hit cooldown state at point start
+  if (p1) p1._lastHitFrameAny = -999;
+  if (p2) p2._lastHitFrameAny = -999;
+}
+// ================== Bot Logic (Smart Prediction + Tuned Movement + Safer Hits) ==================
+let botLastJumpFrame = -100;
+let botSpikeIntent = false;
+
+function botLogic(bot) {
+  const netX = 450;
+  const leftLimit  = 455;
+  const rightLimit = canvas.width - bot.w;
+  const center = bot.x + bot.w / 2;
+  const isServe = (ball.lastTouchedSide === null);
+  const isHard = settings.botDifficulty === "hard";
+
+  const grounded = bot.y >= groundY - 0.1;
+  const cooldownOver = frameCount - botLastJumpFrame > (isHard ? 5 : 8);
+
+  const homeX = isHard ? 700 : 640;
+  const ballOnBotSide = ball.x > netX;
+
+  // ------------------------------
+  // LOCAL HELPERS
+  // ------------------------------
+  function predictLandingTimeLocal(ball) {
+    const y0 = ball.y;
+    const vy = ball.vy;
+    const g = gravity;
+
+    const a = 0.5 * g;
+    const b = vy;
+    const c = y0 - groundY;
+
+    const disc = b * b - 4 * a * c;
+    if (disc < 0 || Math.abs(a) < 1e-6) {
+      return Math.max(8, Math.min(50, (groundY - y0) / Math.abs(vy || 1)));
+    }
+
+    const sqrtD = Math.sqrt(disc);
+    const t1 = (-b - sqrtD) / (2 * a);
+    const t2 = (-b + sqrtD) / (2 * a);
+
+    const tCandidates = [t1, t2].filter(t => t > 0);
+    if (!tCandidates.length) return 24;
+
+    const t = Math.min(...tCandidates);
+    return Math.max(6, Math.min(55, t));
+  }
+
+  function predictLandingXLocal(ball) {
+    const t = predictLandingTimeLocal(ball);
+    return ball.x + ball.vx * t;
+  }
+
+  // 🔮 NEW: predict spike contact X (short horizon)
+  function predictSpikeX(ball) {
+    // Mid horizon for more stable timing
+    const baseT = -ball.vy * 0.6 + 12;
+    const t = Math.max(7, Math.min(18, baseT));
+    return ball.x + ball.vx * t;
+  }
+
+  // ------------------------------
+  // MOVEMENT (unchanged)
+  // ------------------------------
+  if (bot._vx === undefined) bot._vx = 0;
+  if (bot._tx === undefined) bot._tx = center;
+  const smoothTarget = (current, target, blend = 0.16) => current * (1 - blend) + target * blend;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const spikeX = predictSpikeX(ball);
+
+  let predictedX = predictLandingXLocal(ball);
+  // Stay off the back wall on right side (stronger clamp for hard offense, relaxed for deep defense)
+  const baseWallBuffer = isHard ? 70 : 2;
+  const defensiveChase = ballOnBotSide && !botSpikeIntent && ball.y > 260 && ball.vy > 0; // let hard retreat when ball is falling deep
+  // Give more breathing room near back wall during retreat to avoid bonking while reversing
+  const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
+  predictedX = Math.min(Math.max(predictedX, leftLimit + 10), rightLimit - wallBuffer);
+
+  // Safer spike contact away from wall (used in hard only)
+  const safeSpikeX = Math.min(spikeX, rightLimit - 70 - 12);
+  const targetSpikeX = isHard ? safeSpikeX : spikeX;
+  // Disallow spike attempts that will likely drive into the back wall (hard stricter; extra buffer for flat/low balls)
+  const baseSpikeWallMargin = isHard ? 98 : 22;
+  const spikeWallBoost = (ball.y < 220 || ball.vy < 3.2) ? (isHard ? 26 : 36) : 0;
+  const spikeWallSafe = targetSpikeX < rightLimit - (baseSpikeWallMargin + spikeWallBoost);
+
+  const baseMove = bot.speed * (isHard ? 1.6 : 1.4);
+  let moveSpeed = baseMove;
+
+  const targetWhenOnSide = predictedX;
+  const targetWhenOffSide = homeX;
+  const distToTarget = Math.abs(center - (ballOnBotSide ? targetWhenOnSide : targetWhenOffSide));
+
+  if (distToTarget > 140) moveSpeed *= isHard ? 1.8 : 1.55;
+  else if (distToTarget > 80) moveSpeed *= isHard ? 1.42 : 1.28;
+
+  const deepDefense = ballOnBotSide && (predictedX > 760 || ball.x > 780);
+  if (deepDefense) {
+    moveSpeed *= isHard ? 1.35 : 1.25;
+  }
+
+  const isIncomingSpike =
+    ballOnBotSide &&
+    ball.vy > 6 &&
+    ball.y < 220 &&
+    ball.y > 120;
+
+  const isLikelyFeint =
+    ballOnBotSide &&
+    Math.abs(ball.vx) < 2.2 &&
+    Math.abs(ball.vy) < 4 &&
+    ball.y < 260 &&
+    ball.y > 160;
+
+  if (isIncomingSpike || isLikelyFeint) moveSpeed *= isHard ? 1.2 : 1.12;
+
+  // Quick-react when opponent spike is coming tight over the tape to our side
+  const tapeDefense = ballOnBotSide && ball.y < 260 && ball.vy > 4 && Math.abs(ball.x - netX) < 70;
+  if (tapeDefense) {
+    moveSpeed *= isHard ? 1.45 : 1.35;
+  }
+
+  const rawTarget = ballOnBotSide ? Math.min(targetWhenOnSide, rightLimit - wallBuffer) : targetWhenOffSide;
+  const retreatingDeep = ballOnBotSide && predictedX > center + 80 && !botSpikeIntent;
+  const blend = deepDefense ? 0.3 : (retreatingDeep ? 0.28 : 0.2);
+  bot._tx = smoothTarget(bot._tx, rawTarget, blend);
+
+  const desiredVel = clamp((bot._tx - center) * 0.08, -moveSpeed, moveSpeed);
+  let accelLimit = tapeDefense ? (isHard ? 0.68 : 0.55) : (deepDefense ? (isHard ? 0.55 : 0.45) : (isHard ? 0.42 : 0.35));
+  if (retreatingDeep) accelLimit += isHard ? 0.12 : 0.08;
+  if (!ballOnBotSide && ball.vx > 1.8 && ball.y < 360) {
+    accelLimit += isHard ? 0.08 : 0.05;
+    moveSpeed *= isHard ? 1.08 : 1.04;
+  }
+  const accel = clamp(desiredVel - bot._vx, -accelLimit, accelLimit);
+  bot._vx = clamp(bot._vx + accel, -moveSpeed, moveSpeed);
+  bot.x += bot._vx;
+
+  bot.x = Math.min(Math.max(bot.x, leftLimit), rightLimit);
+
+  // Gentle pull toward spike contact when committed (reduce jitter)
+  if (botSpikeIntent && ballOnBotSide) {
+    const aim = targetSpikeX;
+    const pull = baseMove * 0.7;
+    if (center < aim - 8) bot.x += pull;
+    else if (center > aim + 8) bot.x -= pull;
+    bot.x = Math.min(Math.max(bot.x, leftLimit), rightLimit);
+  }
+
+  // ------------------------------
+  // JUMP LOGIC (uses predicted spike X)
+  // ------------------------------
+  const inFront = targetSpikeX > bot.x + 6; // ensure ball is truly ahead
+  const nearNet = bot.x < 600; // bias closer to net before jumping
+  const closeX = Math.abs(center - targetSpikeX) < (isHard ? 230 : 200); // approach window
+
+  const touches = bot.side === "right" ? ball.rightTouches : ball.leftTouches;
+
+  // Simpler rule: only go for a spike after at least one prior touch
+  const wantsToSpike =
+    !isServe &&
+    ballOnBotSide &&
+    grounded &&
+    cooldownOver &&
+    nearNet &&
+    inFront &&
+    closeX &&
+    spikeWallSafe &&
+    ball.y < 360 &&
+    ball.y > 90 &&
+    ball.vy < (isHard ? 8.0 : 7.2) &&
+    touches >= 1 && touches <= 2;
+
+  if (wantsToSpike) {
+    botSpikeIntent = true;
+    bot.vy = -bot.jumpPower * 1.1;
+    botLastJumpFrame = frameCount;
+  }
+
+  bot.vy += gravity;
+  bot.y += bot.vy;
+
+  if (bot.y > groundY) {
+    bot.y = groundY;
+    bot.vy = 0;
+    botSpikeIntent = false;
+  }
+
+  // ------------------------------
+  // HIT LOGIC
+  // ------------------------------
+  // Short per-bot interaction cooldown to avoid tethering the ball (longer right after bot's own set)
+  const lastBotHit = bot._lastHitFrameAny || -999;
+  const recentSelfSet = ball.lastTouchedSide === bot.side && ball.lastTouchType === "set";
+  const minHitCooldown = recentSelfSet ? 6 : 3;
+  if (frameCount - lastBotHit < minHitCooldown) return;
+
+  if (touches >= 3) return;
+
+  // Near-net rescue: if first touch and the ball is hovering by the tape, just receive upward so it doesn't drop
+  if (
+    touches === 0 &&
+    ballOnBotSide &&
+    Math.abs(ball.x - netX) < 42 &&
+    ball.y > 140 &&
+    ball.y < 340 &&
+    ball.vy < 9
+  ) {
+    ball.interact(bot, "receive");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  // Net feint safety: if ball is hovering near the net on our side, just receive it upward and reset
+  if (
+    ballOnBotSide &&
+    Math.abs(ball.x - netX) < 34 &&
+    ball.y > 170 &&
+    ball.y < 320 &&
+    ball.vy > -2.5 &&
+    ball.vy < 6
+  ) {
+    ball.interact(bot, "receive");
+    bot._lastHitFrameAny = frameCount;
+    bot._tx = homeX;
+    return;
+  }
+
+  // Panic receive on late, falling balls so the bot doesn't watch its own set drop
+  if (
+    ballOnBotSide &&
+    touches >= 1 &&
+    grounded &&
+    ball.vy > 2.2 &&
+    ball.y > 300
+  ) {
+    ball.interact(bot, "receive");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  const closeEnough = Math.abs(center - targetSpikeX) < (isHard ? 165 : 138); // moderate swing window
+  // extra forgiveness when airborne and committed
+  const swingForgiveness = (botSpikeIntent && !grounded) ? (isHard ? 34 : 28) : (isHard ? 22 : 16);
+  const earlyForgiveness = touches <= 1 ? (isHard ? 48 : 36) : 0;
+  const closeEnoughForgiven = Math.abs(center - targetSpikeX) < (138 + swingForgiveness + earlyForgiveness);
+
+  // Require reasonable proximity and a descending ball before auto second-touch set to avoid ghost re-sets
+  const withinReach =
+    Math.abs(center - ball.x) < 120 &&
+    Math.abs(bot.y - ball.y) < 120 &&
+    grounded &&
+    ball.vy > -0.8 &&
+    ball.y > 200;
+
+  // Defensive receive fallback: if first touch and on our side, allow even if not perfectly in front/close
+  if (!botSpikeIntent && touches === 0 && ballOnBotSide) {
+    ball.interact(bot, "receive");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  // Ensure second touch happens even when target prediction is off
+  if (!botSpikeIntent && touches === 1 && ballOnBotSide && withinReach) {
+    ball.interact(bot, "set");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  if (!inFront || !closeEnoughForgiven) return;
+
+  if (isServe) {
+    if (ballOnBotSide && ball.y > 230) {
+      ball.interact(bot, "receive");
+    }
+    return;
+  }
+
+  const ballIsLow  = ball.y > 300;
+  const ballIsMid  = ball.y > 230 && ball.y <= 300;
+  const ballIsHigh = ball.y <= 230;
+
+  // Serve reaction delay to add slight randomness to bot openings
+  if (isServe && ballOnBotSide && touches === 0 && botServeDelayFrames > 0) {
+    botServeDelayFrames -= 1;
+    return;
+  }
+
+  // 🔥 COMMITTED SPIKE WINDOW (tempered)
+  if (
+    botSpikeIntent &&
+    ballOnBotSide &&
+    Math.abs(center - targetSpikeX) < (isHard ? 240 : 205) &&
+    ball.y > 112 &&
+    ball.y < 332 &&
+    ball.vy <= (isHard ? 7.6 : 6.4) &&
+    spikeWallSafe // avoid spiking into wall
+  ) {
+    // Avoid tape: if ball is very close to net, give a tiny upward/side damp
+    const nearNetBall = Math.abs(ball.x - 450) < 30;
+    if (nearNetBall) {
+      ball.vy -= 0.6;
+      ball.vx *= 0.94;
+    }
+    ball.interact(bot, "spike");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  // Prevent accidental mid-air touches during spike commit
+  if (botSpikeIntent) return;
+
+  // Simplest touch plan: 1) receive, 2) set, 3) spike else receive
+  if (touches === 0) {
+    ball.interact(bot, "receive");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  if (touches === 1) {
+    ball.interact(bot, "set");
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  if (touches === 2) {
+    // Always try to finish on third touch; loosen spike window slightly
+    if (
+      ballOnBotSide &&
+      Math.abs(center - targetSpikeX) < (isHard ? 245 : 220) &&
+      ball.y > 105 &&
+      ball.y < 340 &&
+      ball.vy <= (isHard ? 9.0 : 8.0) &&
+      spikeWallSafe
+    ) {
+      ball.interact(bot, "spike");
+    } else {
+      // If out of spike window, push it high and deep to buy time to reposition
+      ball.interact(bot, "receive");
+      const sendDir = bot.side === "right" ? -1 : 1;
+      ball.vx = sendDir * 6.5;
+      ball.vy = -7.5;
+      // Start retreating to home after a safe send
+      bot._tx = homeX;
+    }
+    bot._lastHitFrameAny = frameCount;
+    return;
+  }
+
+  // Fallback
+  ball.interact(bot, "receive");
+  bot._lastHitFrameAny = frameCount;
+}
+
+
+
+// ================== Game Loop ==================
+let gameOver = false;
+
+
+
+function drawGameOver() {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "40px Arial";
+  const winner = p1.score > p2.score ? "Player 1 Wins!" : "CPU Wins!";
+  ctx.fillText("GAME OVER", 310, 220);
+  ctx.font = "28px Arial";
+  ctx.fillText(winner, 325, 260);
+  ctx.font = "18px Arial";
+  ctx.fillText(`First to ${settings.targetScore}`, 360, 292);
+  ctx.fillText("Press R to restart", 360, 318);
+  ctx.restore();
+}
+
+function drawPauseOverlay() {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "white";
+  ctx.font = "32px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Paused", canvas.width / 2, canvas.height / 2 - 80);
+
+  ctx.font = "16px Arial";
+  const lines = [
+    `1) SFX volume: ${settings.soundLevel === 0 ? "Muted" : (settings.soundLevel < 1 ? "Medium" : "High")}`,
+    `2) Trails: ${settings.fxTrails ? "On" : "Off"}`,
+    `3) Particles: ${settings.fxParticles ? "On" : "Off"}`,
+    `4) Screen shake: ${settings.screenShake ? "On" : "Off"}`,
+    `5) Trail theme: ${settings.trailStyle === "glow" ? "Ice" : "Ember"}`,
+    `6) Sound style: ${settings.soundStyle === "bright" ? "Bright" : "Soft"}`,
+    `7) Bot: ${settings.botDifficulty}`,
+    `8) Play to: ${settings.targetScore}`,
+    `9) Map: ${maps[settings.mapIndex % maps.length].name}`
+  ];
+
+  let y = canvas.height / 2 - 30;
+  for (const line of lines) {
+    ctx.fillText(line, canvas.width / 2, y);
+    y += 22;
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText("Press P to resume", canvas.width / 2, y + 8);
+  ctx.restore();
+}
+
+function restartGame() {
+  p1.score = 0;
+  p2.score = 0;
+  ball.spikeCharge = { left: 0, right: 0 };
+  ball.reset();
+  resetPositions();
+  gameOver = false;
+}
+
+document.addEventListener("keydown", e => {
+  if (gameOver && (e.key === "r" || e.key === "R")) {
+    restartGame();
+  }
+});
+
+function gameLoop(now) {
+  const current = Number.isFinite(now) ? now : performance.now();
+  const delta = Math.min(50, current - lastTime);
+  lastTime = current;
+  accumulator += delta;
+
+  while (accumulator >= STEP && !paused) {
+    frameCount++;
+
+    if (!gameOver) {
+      // Updates
+      p1.update("a", "d", "w");
+      // bot update is inside botLogic
+      ball.update();
+
+      // Player 1 controls:
+      // q = spike, e = set, s = receive (ground = high bump, air = softer)
+      if (keys["e"]) ball.interact(p1, "set");
+      if (keys["q"]) ball.interact(p1, "spike");
+
+      if (keys["s"]) {
+        // Auto-receive assist: if the ball enters a close bubble, snap a perfect receive
+        const px = p1.x + p1.w / 2;
+        const py = p1.y + p1.h / 2;
+        const dx = ball.x - px;
+        const dy = ball.y - py;
+        const closeBubble = Math.abs(dx) < 150 && Math.abs(dy) < 170;
+
+        // Extra ceiling rescue: if the ball is high and descending near player, force a catch
+        const ceilingRescue = ball.y < 120 && dy > -30 && dy < 200 && Math.abs(dx) < 160;
+
+        if (closeBubble || ceilingRescue) {
+          ball.interact(p1, "receive", 70); // bigger forgiving hitbox for perfect pop
+        } else {
+          ball.interact(p1, "receive", 25);
+        }
+      }
+
+      // Dive auto-receive: while diving, always attempt a receive with a generous bubble
+      if (p1.diveTimer > 0) {
+        ball.interact(p1, "receive", 80);
+      }
+
+      botLogic(p2);
+
+      // Game over condition
+      if (p1.score >= settings.targetScore || p2.score >= settings.targetScore) {
+        gameOver = true;
+      }
+    }
+
+    updateFX();
+    accumulator -= STEP;
+  }
+
+  if (paused) {
+    accumulator = 0; // avoid drift while paused
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+  drawFX();
+
+  drawNet();
+  p1.draw();
+  p2.draw();
+  ball.draw();
+  drawScoreboard();
+  drawStaminaBar(p1);
+  drawSuperCharge(p1);
+  drawSuperCharge(p2);
+  drawKeybinds();
+
+  if (gameOver) {
+    drawGameOver();
+  } else if (paused) {
+    drawPauseOverlay();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
