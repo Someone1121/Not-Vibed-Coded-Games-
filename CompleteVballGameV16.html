@@ -50,9 +50,49 @@ const CONFIG = {
   PLAYER_JUMP_POWER: 13.5,
   PLAYER_MAX_STAMINA: 100,
   
-  // Bot tuning
+  // Bot tuning - base values for normal difficulty
   BOT_SPEED: 4.25,
   BOT_JUMP_POWER: 13.4,
+  
+  // Bot difficulty settings
+  BOT_DIFFICULTY: {
+    easy: {
+      speed: 3.9,
+      jumpPower: 13.0,
+      homeX: 600,
+      moveSpeedMultiplier: 0.85,
+      accelMultiplier: 0.9,
+      reactionMultiplier: 1.3,
+      jumpCooldown: 10,
+      spikeProximity: 180,
+      wallBuffer: 50,
+      swingForgiveness: 18
+    },
+    normal: {
+      speed: 4.25,
+      jumpPower: 13.4,
+      homeX: 640,
+      moveSpeedMultiplier: 1.0,
+      accelMultiplier: 1.0,
+      reactionMultiplier: 1.0,
+      jumpCooldown: 8,
+      spikeProximity: 200,
+      wallBuffer: 2,
+      swingForgiveness: 16
+    },
+    hard: {
+      speed: 4.55,
+      jumpPower: 13.9,
+      homeX: 700,
+      moveSpeedMultiplier: 1.15,
+      accelMultiplier: 1.1,
+      reactionMultiplier: 0.85,
+      jumpCooldown: 5,
+      spikeProximity: 230,
+      wallBuffer: 70,
+      swingForgiveness: 22
+    }
+  },
   
   // Player colors
   PLAYER_COLOR: "#1e88e5",
@@ -127,7 +167,7 @@ const maps = [
     sun: { main: "rgba(255,180,120,0.9)", halo: "rgba(255,120,120,0.65)", radius: 140, alpha: 1 },
     raysAlpha: 0.22,
     cloudColor: "rgba(255,255,255,0.7)",
-    horizon: ["rgba(255,160,140,0.45)", "rgba(255,160,140,0)",],
+    horizon: ["rgba(255,160,140,0.45)", "rgba(255,160,140,0)"],
     water: ["#5a2b78", "#2f1f52"],
     sand: ["#f2c18a", "#d4976b"],
     crowdBase: "#2a1f33",
@@ -1907,19 +1947,17 @@ this.hitUsed = {
 let serveFromLeft = true;
 const p1 = new Player(150, "left", false, CONFIG.PLAYER_COLOR);
 const p2 = new Player(710, "right", true, CONFIG.CPU_COLOR);
+
+/**
+ * Apply bot difficulty settings from CONFIG
+ */
 function applyBotDifficulty() {
   const mode = settings.botDifficulty;
-  if (mode === "easy") {
-    p2.speed = 3.9;
-    p2.jumpPower = 13.0;
-  } else if (mode === "hard") {
-    p2.speed = 4.55;
-    p2.jumpPower = 13.9;
-  } else {
-    p2.speed = 4.25;
-    p2.jumpPower = 13.4;
-  }
+  const config = CONFIG.BOT_DIFFICULTY[mode] || CONFIG.BOT_DIFFICULTY.normal;
+  p2.speed = config.speed;
+  p2.jumpPower = config.jumpPower;
 }
+
 applyBotDifficulty();
 const ball = new Ball();
 
@@ -2279,6 +2317,15 @@ let botSpikeIntent = false;
 
 // ==================== Bot AI Helper Functions ====================
 
+/**
+ * Get bot difficulty configuration
+ * @returns {object} Difficulty config object
+ */
+function getBotDifficultyConfig() {
+  const mode = settings.botDifficulty;
+  return CONFIG.BOT_DIFFICULTY[mode] || CONFIG.BOT_DIFFICULTY.normal;
+}
+
 function predictBallLandingTime(ball) {
   const y0 = ball.y;
   const vy = ball.vy;
@@ -2315,21 +2362,24 @@ function predictBallSpikeContactX(ball) {
   return ball.x + ball.vx * t;
 }
 
-function calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, deepDefense, netX) {
+function calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, diffConfig, deepDefense, netX) {
   const center = bot.x + bot.w / 2;
-  const homeX = isHard ? 700 : 640;
-  const baseMove = bot.speed * (isHard ? 1.6 : 1.4);
+  const homeX = diffConfig.homeX;
+  const baseMoveMultiplier = 1.4 * diffConfig.moveSpeedMultiplier;
+  const baseMove = bot.speed * baseMoveMultiplier;
   let moveSpeed = baseMove;
 
   const targetWhenOnSide = predictedX;
   const targetWhenOffSide = homeX;
   const distToTarget = Math.abs(center - (ballOnBotSide ? targetWhenOnSide : targetWhenOffSide));
 
-  if (distToTarget > 140) moveSpeed *= isHard ? 1.8 : 1.55;
-  else if (distToTarget > 80) moveSpeed *= isHard ? 1.42 : 1.28;
+  // Distance-based speed adjustments
+  const distSpeedFactor = diffConfig.moveSpeedMultiplier;
+  if (distToTarget > 140) moveSpeed *= 1.55 * distSpeedFactor;
+  else if (distToTarget > 80) moveSpeed *= 1.28 * distSpeedFactor;
 
   if (deepDefense) {
-    moveSpeed *= isHard ? 1.35 : 1.25;
+    moveSpeed *= 1.25 * diffConfig.moveSpeedMultiplier;
   }
 
   const isIncomingSpike =
@@ -2345,29 +2395,29 @@ function calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, dee
     ball.y < 260 &&
     ball.y > 160;
 
-  if (isIncomingSpike || isLikelyFeint) moveSpeed *= isHard ? 1.2 : 1.12;
+  if (isIncomingSpike || isLikelyFeint) moveSpeed *= 1.12 * diffConfig.moveSpeedMultiplier;
 
   const tapeDefense = ballOnBotSide && ball.y < 260 && ball.vy > 4 && Math.abs(ball.x - netX) < 70;
   if (tapeDefense) {
-    moveSpeed *= isHard ? 1.45 : 1.35;
+    moveSpeed *= 1.35 * diffConfig.moveSpeedMultiplier;
   }
 
   return { moveSpeed, tapeDefense, baseMove };
 }
 
-function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, isHard, netX, leftLimit, rightLimit) {
+function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, diffConfig, netX, leftLimit, rightLimit) {
   const center = bot.x + bot.w / 2;
-  const homeX = isHard ? 700 : 640;
+  const homeX = diffConfig.homeX;
   
   const smoothTarget = (current, target, blend = 0.16) => current * (1 - blend) + target * blend;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-  const baseWallBuffer = isHard ? 70 : 2;
+  const baseWallBuffer = diffConfig.wallBuffer;
   const defensiveChase = ballOnBotSide && !botSpikeIntent && ball.y > 260 && ball.vy > 0;
-  const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
+  const wallBuffer = defensiveChase ? 28 : baseWallBuffer;
 
   const deepDefense = ballOnBotSide && (predictedX > 760 || ball.x > 780);
-  let { moveSpeed, tapeDefense, baseMove } = calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, deepDefense, netX);
+  let { moveSpeed, tapeDefense, baseMove } = calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, diffConfig, deepDefense, netX);
 
   const rawTarget = ballOnBotSide ? Math.min(predictedX, rightLimit - wallBuffer) : homeX;
   const retreatingDeep = ballOnBotSide && predictedX > center + 80 && !botSpikeIntent;
@@ -2375,11 +2425,12 @@ function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, i
   bot._tx = smoothTarget(bot._tx, rawTarget, blend);
 
   const desiredVel = clamp((bot._tx - center) * 0.08, -moveSpeed, moveSpeed);
-  let accelLimit = tapeDefense ? (isHard ? 0.68 : 0.55) : (deepDefense ? (isHard ? 0.55 : 0.45) : (isHard ? 0.42 : 0.35));
-  if (retreatingDeep) accelLimit += isHard ? 0.12 : 0.08;
+  const baseAccel = diffConfig.accelMultiplier;
+  let accelLimit = tapeDefense ? (0.55 * baseAccel) : (deepDefense ? (0.45 * baseAccel) : (0.35 * baseAccel));
+  if (retreatingDeep) accelLimit += 0.08 * baseAccel;
   if (!ballOnBotSide && ball.vx > 1.8 && ball.y < 360) {
-    accelLimit += isHard ? 0.08 : 0.05;
-    moveSpeed *= isHard ? 1.08 : 1.04;
+    accelLimit += 0.05 * baseAccel;
+    moveSpeed *= 1.04 * diffConfig.moveSpeedMultiplier;
   }
   const accel = clamp(desiredVel - bot._vx, -accelLimit, accelLimit);
   bot._vx = clamp(bot._vx + accel, -moveSpeed, moveSpeed);
@@ -2396,14 +2447,15 @@ function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, i
   }
 }
 
-function shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver) {
+function shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, diffConfig, grounded, cooldownOver) {
   const center = bot.x + bot.w / 2;
   const inFront = targetSpikeX > bot.x + 6;
   const nearNet = bot.x < 600;
-  const closeX = Math.abs(center - targetSpikeX) < (isHard ? 230 : 200);
+  const closeX = Math.abs(center - targetSpikeX) < diffConfig.spikeProximity;
 
   const touches = bot.side === "right" ? ball.rightTouches : ball.leftTouches;
 
+  const vyThreshold = 7.2 + (diffConfig.moveSpeedMultiplier * 0.8);
   const wantsToSpike =
     !isServe &&
     ballOnBotSide &&
@@ -2415,14 +2467,14 @@ function shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWall
     spikeWallSafe &&
     ball.y < 360 &&
     ball.y > 90 &&
-    ball.vy < (isHard ? 8.0 : 7.2) &&
+    ball.vy < vyThreshold &&
     touches >= 1 && touches <= 2;
 
   return wantsToSpike;
 }
 
-function updateBotJumpAndGravity(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver) {
-  const wantsToSpike = shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver);
+function updateBotJumpAndGravity(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, diffConfig, grounded, cooldownOver) {
+  const wantsToSpike = shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, diffConfig, grounded, cooldownOver);
 
   if (wantsToSpike) {
     botSpikeIntent = true;
@@ -2508,16 +2560,18 @@ function handleBotDefensiveReceive(bot, ball, ballOnBotSide, touches, grounded) 
   return false;
 }
 
-function handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isHard) {
+function handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, diffConfig) {
   const center = bot.x + bot.w / 2;
+  const proximityThreshold = 205 * (1 + (diffConfig.moveSpeedMultiplier - 1) * 0.5);
+  const vyThreshold = 6.4 + (diffConfig.moveSpeedMultiplier * 1.2);
   
   if (
     botSpikeIntent &&
     ballOnBotSide &&
-    Math.abs(center - targetSpikeX) < (isHard ? 240 : 205) &&
+    Math.abs(center - targetSpikeX) < proximityThreshold &&
     ball.y > 112 &&
     ball.y < 332 &&
-    ball.vy <= (isHard ? 7.6 : 6.4) &&
+    ball.vy <= vyThreshold &&
     spikeWallSafe
   ) {
     const nearNetBall = Math.abs(ball.x - 450) < 30;
@@ -2533,7 +2587,7 @@ function handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWa
   return false;
 }
 
-function handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, touches, isHard, homeX) {
+function handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, touches, diffConfig, homeX) {
   const center = bot.x + bot.w / 2;
 
   if (touches === 0) {
@@ -2549,12 +2603,15 @@ function handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWal
   }
 
   if (touches === 2) {
+    const proximityThreshold = 220 * (1 + (diffConfig.moveSpeedMultiplier - 1) * 0.5);
+    const vyThreshold = 8.0 + (diffConfig.moveSpeedMultiplier);
+    
     if (
       ballOnBotSide &&
-      Math.abs(center - targetSpikeX) < (isHard ? 245 : 220) &&
+      Math.abs(center - targetSpikeX) < proximityThreshold &&
       ball.y > 105 &&
       ball.y < 340 &&
-      ball.vy <= (isHard ? 9.0 : 8.0) &&
+      ball.vy <= vyThreshold &&
       spikeWallSafe
     ) {
       ball.interact(bot, "spike");
@@ -2580,12 +2637,14 @@ function botLogic(bot) {
   const rightLimit = canvas.width - bot.w;
   const center = bot.x + bot.w / 2;
   const isServe = (ball.lastTouchedSide === null);
-  const isHard = settings.botDifficulty === "hard";
+  
+  // Get difficulty configuration
+  const diffConfig = getBotDifficultyConfig();
 
   const grounded = bot.y >= groundY - 0.1;
-  const cooldownOver = frameCount - botLastJumpFrame > (isHard ? 5 : 8);
+  const cooldownOver = frameCount - botLastJumpFrame > diffConfig.jumpCooldown;
 
-  const homeX = isHard ? 700 : 640;
+  const homeX = diffConfig.homeX;
   const ballOnBotSide = ball.x > netX;
 
   if (bot._vx === undefined) bot._vx = 0;
@@ -2594,19 +2653,20 @@ function botLogic(bot) {
   const spikeX = predictBallSpikeContactX(ball);
   let predictedX = predictBallLandingX(ball);
   
-  const baseWallBuffer = isHard ? 70 : 2;
+  const baseWallBuffer = diffConfig.wallBuffer;
   const defensiveChase = ballOnBotSide && !botSpikeIntent && ball.y > 260 && ball.vy > 0;
-  const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
+  const wallBuffer = defensiveChase ? 28 : baseWallBuffer;
   predictedX = Math.min(Math.max(predictedX, leftLimit + 10), rightLimit - wallBuffer);
 
   const safeSpikeX = Math.min(spikeX, rightLimit - 70 - 12);
-  const targetSpikeX = isHard ? safeSpikeX : spikeX;
-  const baseSpikeWallMargin = isHard ? 98 : 22;
-  const spikeWallBoost = (ball.y < 220 || ball.vy < 3.2) ? (isHard ? 26 : 36) : 0;
+  // Hard mode uses safer spike position, easy uses more aggressive
+  const targetSpikeX = diffConfig.moveSpeedMultiplier > 1.0 ? safeSpikeX : spikeX;
+  const baseSpikeWallMargin = 22 * diffConfig.accelMultiplier;
+  const spikeWallBoost = (ball.y < 220 || ball.vy < 3.2) ? (36 / diffConfig.accelMultiplier) : 0;
   const spikeWallSafe = targetSpikeX < rightLimit - (baseSpikeWallMargin + spikeWallBoost);
 
-  updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, isHard, netX, leftLimit, rightLimit);
-  updateBotJumpAndGravity(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver);
+  updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, diffConfig, netX, leftLimit, rightLimit);
+  updateBotJumpAndGravity(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, diffConfig, grounded, cooldownOver);
 
   const lastBotHit = bot._lastHitFrameAny || -999;
   const recentSelfSet = ball.lastTouchedSide === bot.side && ball.lastTouchType === "set";
@@ -2619,8 +2679,8 @@ function botLogic(bot) {
   if (handleBotEmergencyReceives(bot, ball, ballOnBotSide, touches, grounded, netX, homeX)) return;
 
   const inFront = targetSpikeX > bot.x + 6;
-  const swingForgiveness = (botSpikeIntent && !grounded) ? (isHard ? 34 : 28) : (isHard ? 22 : 16);
-  const earlyForgiveness = touches <= 1 ? (isHard ? 48 : 36) : 0;
+  const swingForgiveness = (botSpikeIntent && !grounded) ? 28 : diffConfig.swingForgiveness;
+  const earlyForgiveness = touches <= 1 ? (36 * diffConfig.reactionMultiplier) : 0;
   const closeEnoughForgiven = Math.abs(center - targetSpikeX) < (138 + swingForgiveness + earlyForgiveness);
 
   if (handleBotDefensiveReceive(bot, ball, ballOnBotSide, touches, grounded)) return;
@@ -2639,11 +2699,11 @@ function botLogic(bot) {
     return;
   }
 
-  if (handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isHard)) return;
+  if (handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, diffConfig)) return;
 
   if (botSpikeIntent) return;
 
-  if (handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, touches, isHard, homeX)) return;
+  if (handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, touches, diffConfig, homeX)) return;
 
   ball.interact(bot, "receive");
   bot._lastHitFrameAny = frameCount;
