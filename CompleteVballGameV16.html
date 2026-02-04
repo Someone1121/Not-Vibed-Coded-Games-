@@ -2139,19 +2139,16 @@ function drawKeybinds() {
   ctx.restore();
 }
 
-function drawBackground() {
-  const map = maps[settings.mapIndex % maps.length];
-  const isIndoor = !!map.indoor;
-
-  // Sky
+function drawSky(map) {
   const sky = ctx.createLinearGradient(0, 0, 0, 320);
   sky.addColorStop(0, map.sky[0]);
   sky.addColorStop(0.35, map.sky[1]);
   sky.addColorStop(1, map.sky[2]);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, canvas.width, 320);
+}
 
-  // Sun + halo (outdoor only)
+function drawSun(map, isIndoor) {
   const sunX = 140, sunY = 80;
   if (!isIndoor && map.sun.alpha > 0) {
     const sun = ctx.createRadialGradient(sunX, sunY, 14, sunX, sunY, map.sun.radius);
@@ -2166,8 +2163,10 @@ function drawBackground() {
     ctx.fill();
     ctx.restore();
   }
+}
 
-  // Light rays (outdoor only)
+function drawLightRays(map, isIndoor) {
+  const sunX = 140;
   if (!isIndoor && map.raysAlpha > 0) {
     ctx.save();
     ctx.globalAlpha = map.raysAlpha;
@@ -2183,8 +2182,9 @@ function drawBackground() {
     }
     ctx.restore();
   }
+}
 
-  // High clouds (outdoor only)
+function drawClouds(map, isIndoor) {
   if (!isIndoor) {
     ctx.fillStyle = map.cloudColor;
     for (let i = 0; i < 4; i++) {
@@ -2197,15 +2197,17 @@ function drawBackground() {
       ctx.fill();
     }
   }
+}
 
-  // Horizon glow
+function drawHorizon(map) {
   const horizon = ctx.createLinearGradient(0, 200, 0, 320);
   horizon.addColorStop(0, map.horizon[0]);
   horizon.addColorStop(1, map.horizon[1]);
   ctx.fillStyle = horizon;
   ctx.fillRect(0, 180, canvas.width, 160);
+}
 
-  // Ocean band
+function drawWater(map) {
   const water = ctx.createLinearGradient(0, 220, 0, 270);
   water.addColorStop(0, map.water[0]);
   water.addColorStop(1, map.water[1]);
@@ -2217,8 +2219,9 @@ function drawBackground() {
     ctx.ellipse(i + 30, 260 + Math.sin(i * 0.02) * 3, 60, 8, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+}
 
-  // Distant crowd band
+function drawCrowd(map) {
   ctx.fillStyle = map.crowdBase;
   ctx.fillRect(0, 240, canvas.width, 44);
   ctx.fillStyle = map.crowdAccent;
@@ -2226,15 +2229,17 @@ function drawBackground() {
     const h = 14 + (i % 3 === 0 ? 4 : 0);
     ctx.fillRect(i, 244, 10, h);
   }
+}
 
-  // Sand + court
+function drawSand(map) {
   const sand = ctx.createLinearGradient(0, 260, 0, canvas.height);
   sand.addColorStop(0, map.sand[0]);
   sand.addColorStop(1, map.sand[1]);
   ctx.fillStyle = sand;
   ctx.fillRect(0, 260, canvas.width, canvas.height - 260);
+}
 
-  // Sand noise bands
+function drawSandTexture() {
   ctx.strokeStyle = "rgba(255,255,255,0.12)";
   ctx.lineWidth = 1;
   for (let y = 300; y < canvas.height; y += 22) {
@@ -2245,8 +2250,9 @@ function drawBackground() {
     }
     ctx.stroke();
   }
+}
 
-  // Court panels
+function drawCourtLines() {
   ctx.save();
   ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
   ctx.lineWidth = 2;
@@ -2260,13 +2266,31 @@ function drawBackground() {
   ctx.lineTo(450, 460);
   ctx.stroke();
   ctx.restore();
+}
 
-  // Ground vignette
+function drawVignette(map) {
   const vignette = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 140, canvas.width / 2, canvas.height / 2, 540);
   vignette.addColorStop(0.55, "rgba(0,0,0,0)");
   vignette.addColorStop(1, `rgba(0,0,0,${map.vignetteAlpha})`);
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawBackground() {
+  const map = maps[settings.mapIndex % maps.length];
+  const isIndoor = !!map.indoor;
+
+  drawSky(map);
+  drawSun(map, isIndoor);
+  drawLightRays(map, isIndoor);
+  drawClouds(map, isIndoor);
+  drawHorizon(map);
+  drawWater(map);
+  drawCrowd(map);
+  drawSand(map);
+  drawSandTexture();
+  drawCourtLines();
+  drawVignette(map);
 }
 
 function resetPositions() {
