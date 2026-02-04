@@ -1848,8 +1848,8 @@ this.hitUsed = {
     if (this._applyThirdHitReceiveSet(player, type, isThirdHit, dir, addCharge)) return;
     if (this._applyReceive(player, type, grounded, dir, addCharge)) return;
     
-    // Set and spike don't early return; they continue to final bookkeeping
-    // Only one of set or spike will match the action type
+    // Set and spike check type internally; only one will execute per interaction
+    // Whichever executes continues to final bookkeeping (no early return)
     if (!this._applySet(player, type, touches, dir, addCharge)) {
       this._applySpike(player, type, sprinting, touches, isThirdHit, dir, addCharge);
     }
