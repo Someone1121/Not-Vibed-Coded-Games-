@@ -2367,7 +2367,7 @@ function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, i
   const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
 
   const deepDefense = ballOnBotSide && (predictedX > 760 || ball.x > 780);
-  const { moveSpeed, tapeDefense, baseMove } = calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, deepDefense, netX);
+  let { moveSpeed, tapeDefense, baseMove } = calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, deepDefense, netX);
 
   const rawTarget = ballOnBotSide ? Math.min(predictedX, rightLimit - wallBuffer) : homeX;
   const retreatingDeep = ballOnBotSide && predictedX > center + 80 && !botSpikeIntent;
