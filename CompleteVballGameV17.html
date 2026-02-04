@@ -1967,7 +1967,9 @@ this.hitUsed = {
   }
 
   _canInteract(player) {
-    if (frameCount - this.lastInteractFrame < 2) return false;
+    // Only apply cooldown if same side is trying to hit again (prevents double-hit bugs on same team)
+    // Allow immediate response from opposite side for rapid volleys
+    if (this.lastTouchedSide === player.side && frameCount - this.lastInteractFrame < 2) return false;
     if (frameCount <= this.superArmorUntilFrame && this.lastTouchedSide && player.side !== this.lastTouchedSide) return false;
     if (player.side === "left" && this.x > netRight) return false;
     if (player.side === "right" && this.x < netLeft) return false;
