@@ -932,36 +932,7 @@ class Player {
 
 // ================== Helper Functions ==================
 /**
- * Draw a limb with shadow effect
- * @param {object} start - Start point {x, y}
- * @param {object} joint - Middle joint point {x, y}
- * @param {object} end - End point {x, y}
- * @param {string} color - Color for the limb
- */
-function drawLimbWithShadow(start, joint, end, color) {
-  // Draw shadow
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.lineTo(joint.x, joint.y);
-  ctx.moveTo(joint.x, joint.y);
-  ctx.lineTo(end.x, end.y);
-  ctx.stroke();
-  
-  // Draw colored limb
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.lineTo(joint.x, joint.y);
-  ctx.moveTo(joint.x, joint.y);
-  ctx.lineTo(end.x, end.y);
-  ctx.stroke();
-}
-
-/**
- * Draw multiple limbs at once
+ * Draw multiple limbs at once with shadow effect
  * @param {array} limbs - Array of limb data [{start, joint, end}, ...]
  * @param {string} color - Color for all limbs
  */
@@ -2408,6 +2379,7 @@ function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, i
   if (retreatingDeep) accelLimit += isHard ? 0.12 : 0.08;
   if (!ballOnBotSide && ball.vx > 1.8 && ball.y < 360) {
     accelLimit += isHard ? 0.08 : 0.05;
+    moveSpeed *= isHard ? 1.08 : 1.04;
   }
   const accel = clamp(desiredVel - bot._vx, -accelLimit, accelLimit);
   bot._vx = clamp(bot._vx + accel, -moveSpeed, moveSpeed);
