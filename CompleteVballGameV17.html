@@ -334,18 +334,39 @@ document.addEventListener("keydown", e => {
     }
   }
   
-  // P2 controls (arrow keys and numpad)
+  // P2 controls (IJKL for movement)
   if (settings.multiplayerEnabled) {
-    if (key === "arrowleft") {
-      p2Keys["arrowleft"] = true;
+    if (key === "j") {
+      p2Keys["j"] = true;
       return;
     }
-    if (key === "arrowright") {
-      p2Keys["arrowright"] = true;
+    if (key === "l") {
+      p2Keys["l"] = true;
       return;
     }
-    if (key === "arrowup") {
-      p2Keys["arrowup"] = true;
+    if (key === "i") {
+      p2Keys["i"] = true;
+      return;
+    }
+    // P2 action keys
+    if (key === "u") {
+      p2Keys["u"] = true;
+      return;
+    }
+    if (key === "o") {
+      p2Keys["o"] = true;
+      return;
+    }
+    if (key === "k") {
+      p2Keys["k"] = true;
+      return;
+    }
+    if (key === ";") {
+      p2Keys[";"] = true;
+      return;
+    }
+    if (key === "'") {
+      p2Keys["'"] = true;
       return;
     }
   }
@@ -382,18 +403,39 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => {
   const key = (e.key || "").toLowerCase();
   
-  // P2 arrow keys
+  // P2 IJKL keys
   if (settings.multiplayerEnabled) {
-    if (key === "arrowleft") {
-      p2Keys["arrowleft"] = false;
+    if (key === "j") {
+      p2Keys["j"] = false;
       return;
     }
-    if (key === "arrowright") {
-      p2Keys["arrowright"] = false;
+    if (key === "l") {
+      p2Keys["l"] = false;
       return;
     }
-    if (key === "arrowup") {
-      p2Keys["arrowup"] = false;
+    if (key === "i") {
+      p2Keys["i"] = false;
+      return;
+    }
+    // P2 action keys
+    if (key === "u") {
+      p2Keys["u"] = false;
+      return;
+    }
+    if (key === "o") {
+      p2Keys["o"] = false;
+      return;
+    }
+    if (key === "k") {
+      p2Keys["k"] = false;
+      return;
+    }
+    if (key === ";") {
+      p2Keys[";"] = false;
+      return;
+    }
+    if (key === "'") {
+      p2Keys["'"] = false;
       return;
     }
   }
@@ -693,7 +735,7 @@ class Player {
       
       // Determine which keys object to use (P1 uses global keys, P2 uses p2Keys if multiplayer)
       const activeKeys = p2Keys || keys;
-      const sprintKey = p2Keys ? "rshift" : "shift";
+      const sprintKey = p2Keys ? "'" : "shift";
       const isSprinting = activeKeys[sprintKey] && this.stamina > 0;
 
       if (isSprinting) {
@@ -716,7 +758,7 @@ class Player {
         // Horizontal movement
         const stunned = this.postDiveStun > 0;
         const activeKeys = p2Keys || keys;
-        const diveKey = p2Keys ? "numpad0" : "f";
+        const diveKey = p2Keys ? ";" : "f";
 
         if (!stunned) {
           if (activeKeys[leftKey]) {
@@ -727,7 +769,7 @@ class Player {
           }
         }
 
-        // Dive trigger (F for P1, NumPad0 for P2) when grounded or very low
+        // Dive trigger (F for P1, ; for P2) when grounded or very low
         if (activeKeys[diveKey] && this.diveTimer <= 0 && this.diveCooldown <= 0 && this.postDiveStun <= 0 && this.y >= groundY - 6 && this.stamina >= 55) {
           const dir = activeKeys[leftKey] ? -1 : (activeKeys[rightKey] ? 1 : (this.side === "left" ? 1 : -1));
           this.diveDir = dir;
@@ -738,7 +780,7 @@ class Player {
           this.lastHitFrame["dive"] = frameCount;
         }
 
-        // Jump (W or Space for P1, ArrowUp for P2) – still only when grounded and not diving
+        // Jump (W or Space for P1, I for P2) – still only when grounded and not diving
         const jumpPressed = activeKeys[jumpKey] || (p2Keys ? false : activeKeys[" "]);
         if (jumpPressed && this.isGrounded() && this.diveTimer <= 0 && this.postDiveStun <= 0) {
           this.vy = -this.jumpPower * jumpMod;
@@ -2174,9 +2216,9 @@ function drawStaminaBar(player) {
   const height = 16;
   const padding = 20;
   
-  // P1 stamina at bottom-left, P2 stamina at top-right (to avoid controls overlap)
+  // P1 stamina at bottom-left, P2 stamina at bottom-right
   const x = player.side === "left" ? padding : canvas.width - width - padding;
-  const y = player.side === "left" ? canvas.height - height - 6 : 36;
+  const y = canvas.height - height - 6;
 
   const pct = Math.max(0, Math.min(1, player.stamina / player.maxStamina));
 
@@ -2197,9 +2239,9 @@ function drawStaminaBar(player) {
   ctx.fillStyle = "white";
   ctx.font = "12px 'Segoe UI', Arial";
   ctx.textAlign = "left";
-  ctx.textBaseline = player.side === "left" ? "top" : "bottom";
+  ctx.textBaseline = "top";
   const label = isCPU ? "CPU Stamina" : (player.side === "left" ? "P1 Stamina" : "P2 Stamina");
-  ctx.fillText(label, x, player.side === "left" ? y - 6 : y + height + 6);
+  ctx.fillText(label, x, y - 6);
   ctx.restore();
 }
 
@@ -2262,11 +2304,12 @@ function drawKeybinds() {
   const y = 520 - 42; // align with stamina bar
   const x = staminaX + staminaWidth + 20;
 
+  // Simplified controls display
   let text;
   if (settings.multiplayerEnabled) {
-    text = "P1: WASD/QES/F/Shift | P2: Arrows/Num1-3/Num0/RShift | P pause | M mute";
+    text = "P1: WASD/QES/F | P2: IJKL/UOK/; | P pause";
   } else {
-    text = "W/A/D move & jump | Q spike | E set | S receive / feint (air) | F dive | Shift sprint | P/Esc pause | M mute";
+    text = "WASD move | QES actions | F dive | Shift sprint | P pause";
   }
   
   ctx.font = "12px 'Segoe UI', Arial";
@@ -3010,6 +3053,19 @@ function drawPauseOverlay() {
 
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.fillText("Press P to resume", canvas.width / 2, y + 8);
+  
+  // Show full controls at bottom of pause menu
+  ctx.font = "14px Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  y += 40;
+  if (settings.multiplayerEnabled) {
+    ctx.fillText("P1: W/A/D move & jump | Q spike | E set | S receive | F dive | Shift sprint", canvas.width / 2, y);
+    y += 18;
+    ctx.fillText("P2: I/J/L move & jump | U spike | O set | K receive | ; dive | ' sprint", canvas.width / 2, y);
+  } else {
+    ctx.fillText("W/A/D move & jump | Q spike | E set | S receive | F dive | Shift sprint | M mute", canvas.width / 2, y);
+  }
+  
   ctx.restore();
 }
 
@@ -3043,7 +3099,7 @@ function gameLoop(now) {
       
       // P2 update: use bot logic if not multiplayer, or human controls if multiplayer
       if (settings.multiplayerEnabled) {
-        p2.update("arrowleft", "arrowright", "arrowup", p2Keys);
+        p2.update("j", "l", "i", p2Keys);
       }
       
       ball.update();
@@ -3078,10 +3134,10 @@ function gameLoop(now) {
 
       // Player 2 controls (multiplayer mode)
       if (settings.multiplayerEnabled) {
-        if (p2Keys["numpad2"]) ball.interact(p2, "set");
-        if (p2Keys["numpad1"]) ball.interact(p2, "spike");
+        if (p2Keys["o"]) ball.interact(p2, "set");
+        if (p2Keys["u"]) ball.interact(p2, "spike");
 
-        if (p2Keys["numpad3"]) {
+        if (p2Keys["k"]) {
           const px = p2.x + p2.w / 2;
           const py = p2.y + p2.h / 2;
           const dx = ball.x - px;
