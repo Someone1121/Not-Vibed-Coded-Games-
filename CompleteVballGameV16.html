@@ -1848,8 +1848,9 @@ this.hitUsed = {
     if (this._applyThirdHitReceiveSet(player, type, isThirdHit, dir, addCharge)) return;
     if (this._applyReceive(player, type, grounded, dir, addCharge)) return;
     
-    this._applySet(player, type, touches, dir, addCharge);
-    this._applySpike(player, type, sprinting, touches, isThirdHit, dir, addCharge);
+    if (!this._applySet(player, type, touches, dir, addCharge)) {
+      this._applySpike(player, type, sprinting, touches, isThirdHit, dir, addCharge);
+    }
 
     this._finalBookkeeping(player, type);
 
