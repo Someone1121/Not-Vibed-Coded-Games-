@@ -3059,11 +3059,11 @@ function drawPauseOverlay() {
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   y += 40;
   if (settings.multiplayerEnabled) {
-    ctx.fillText("P1: W/A/D move & jump | Q spike | E set | S receive | F dive | Shift sprint", canvas.width / 2, y);
+    ctx.fillText("P1: W/A/D move & jump | Q spike | E set | S receive/feint | F dive | Shift sprint", canvas.width / 2, y);
     y += 18;
-    ctx.fillText("P2: I/J/L move & jump | U spike | O set | K receive | ; dive | ' sprint", canvas.width / 2, y);
+    ctx.fillText("P2: I/J/L move & jump | U spike | O set | K receive/feint | ; dive | ' sprint", canvas.width / 2, y);
   } else {
-    ctx.fillText("W/A/D move & jump | Q spike | E set | S receive | F dive | Shift sprint | M mute", canvas.width / 2, y);
+    ctx.fillText("W/A/D move & jump | Q spike | E set | S receive/feint | F dive | Shift sprint | M mute", canvas.width / 2, y);
   }
   
   ctx.restore();
