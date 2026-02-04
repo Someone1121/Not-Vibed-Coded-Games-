@@ -2145,7 +2145,8 @@ function drawScoreboard() {
   ctx.fillStyle = "#f7fbff";
   ctx.font = "22px 'Segoe UI', Arial";
   ctx.fillText("P1: " + p1.score, 346, 42);
-  ctx.fillText("CPU: " + p2.score, 456, 42);
+  const p2Label = settings.multiplayerEnabled ? "P2" : "CPU";
+  ctx.fillText(p2Label + ": " + p2.score, 456, 42);
 
   ctx.font = "12px 'Segoe UI', Arial";
   ctx.fillStyle = "rgba(255,255,255,0.7)";
