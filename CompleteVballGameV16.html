@@ -2282,87 +2282,47 @@ function resetPositions() {
 let botLastJumpFrame = -100;
 let botSpikeIntent = false;
 
-function botLogic(bot) {
-  const netX = 450;
-  const leftLimit  = 455;
-  const rightLimit = canvas.width - bot.w;
+// ==================== Bot AI Helper Functions ====================
+
+function predictBallLandingTime(ball) {
+  const y0 = ball.y;
+  const vy = ball.vy;
+  const g = gravity;
+
+  const a = 0.5 * g;
+  const b = vy;
+  const c = y0 - groundY;
+
+  const disc = b * b - 4 * a * c;
+  if (disc < 0 || Math.abs(a) < 1e-6) {
+    return Math.max(8, Math.min(50, (groundY - y0) / Math.abs(vy || 1)));
+  }
+
+  const sqrtD = Math.sqrt(disc);
+  const t1 = (-b - sqrtD) / (2 * a);
+  const t2 = (-b + sqrtD) / (2 * a);
+
+  const tCandidates = [t1, t2].filter(t => t > 0);
+  if (!tCandidates.length) return 24;
+
+  const t = Math.min(...tCandidates);
+  return Math.max(6, Math.min(55, t));
+}
+
+function predictBallLandingX(ball) {
+  const t = predictBallLandingTime(ball);
+  return ball.x + ball.vx * t;
+}
+
+function predictBallSpikeContactX(ball) {
+  const baseT = -ball.vy * 0.6 + 12;
+  const t = Math.max(7, Math.min(18, baseT));
+  return ball.x + ball.vx * t;
+}
+
+function calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, deepDefense, netX) {
   const center = bot.x + bot.w / 2;
-  const isServe = (ball.lastTouchedSide === null);
-  const isHard = settings.botDifficulty === "hard";
-
-  const grounded = bot.y >= groundY - 0.1;
-  const cooldownOver = frameCount - botLastJumpFrame > (isHard ? 5 : 8);
-
   const homeX = isHard ? 700 : 640;
-  const ballOnBotSide = ball.x > netX;
-
-  // ------------------------------
-  // LOCAL HELPERS
-  // ------------------------------
-  function predictLandingTimeLocal(ball) {
-    const y0 = ball.y;
-    const vy = ball.vy;
-    const g = gravity;
-
-    const a = 0.5 * g;
-    const b = vy;
-    const c = y0 - groundY;
-
-    const disc = b * b - 4 * a * c;
-    if (disc < 0 || Math.abs(a) < 1e-6) {
-      return Math.max(8, Math.min(50, (groundY - y0) / Math.abs(vy || 1)));
-    }
-
-    const sqrtD = Math.sqrt(disc);
-    const t1 = (-b - sqrtD) / (2 * a);
-    const t2 = (-b + sqrtD) / (2 * a);
-
-    const tCandidates = [t1, t2].filter(t => t > 0);
-    if (!tCandidates.length) return 24;
-
-    const t = Math.min(...tCandidates);
-    return Math.max(6, Math.min(55, t));
-  }
-
-  function predictLandingXLocal(ball) {
-    const t = predictLandingTimeLocal(ball);
-    return ball.x + ball.vx * t;
-  }
-
-  // 🔮 NEW: predict spike contact X (short horizon)
-  function predictSpikeX(ball) {
-    // Mid horizon for more stable timing
-    const baseT = -ball.vy * 0.6 + 12;
-    const t = Math.max(7, Math.min(18, baseT));
-    return ball.x + ball.vx * t;
-  }
-
-  // ------------------------------
-  // MOVEMENT (unchanged)
-  // ------------------------------
-  if (bot._vx === undefined) bot._vx = 0;
-  if (bot._tx === undefined) bot._tx = center;
-  const smoothTarget = (current, target, blend = 0.16) => current * (1 - blend) + target * blend;
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-  const spikeX = predictSpikeX(ball);
-
-  let predictedX = predictLandingXLocal(ball);
-  // Stay off the back wall on right side (stronger clamp for hard offense, relaxed for deep defense)
-  const baseWallBuffer = isHard ? 70 : 2;
-  const defensiveChase = ballOnBotSide && !botSpikeIntent && ball.y > 260 && ball.vy > 0; // let hard retreat when ball is falling deep
-  // Give more breathing room near back wall during retreat to avoid bonking while reversing
-  const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
-  predictedX = Math.min(Math.max(predictedX, leftLimit + 10), rightLimit - wallBuffer);
-
-  // Safer spike contact away from wall (used in hard only)
-  const safeSpikeX = Math.min(spikeX, rightLimit - 70 - 12);
-  const targetSpikeX = isHard ? safeSpikeX : spikeX;
-  // Disallow spike attempts that will likely drive into the back wall (hard stricter; extra buffer for flat/low balls)
-  const baseSpikeWallMargin = isHard ? 98 : 22;
-  const spikeWallBoost = (ball.y < 220 || ball.vy < 3.2) ? (isHard ? 26 : 36) : 0;
-  const spikeWallSafe = targetSpikeX < rightLimit - (baseSpikeWallMargin + spikeWallBoost);
-
   const baseMove = bot.speed * (isHard ? 1.6 : 1.4);
   let moveSpeed = baseMove;
 
@@ -2373,7 +2333,6 @@ function botLogic(bot) {
   if (distToTarget > 140) moveSpeed *= isHard ? 1.8 : 1.55;
   else if (distToTarget > 80) moveSpeed *= isHard ? 1.42 : 1.28;
 
-  const deepDefense = ballOnBotSide && (predictedX > 760 || ball.x > 780);
   if (deepDefense) {
     moveSpeed *= isHard ? 1.35 : 1.25;
   }
@@ -2393,13 +2352,29 @@ function botLogic(bot) {
 
   if (isIncomingSpike || isLikelyFeint) moveSpeed *= isHard ? 1.2 : 1.12;
 
-  // Quick-react when opponent spike is coming tight over the tape to our side
   const tapeDefense = ballOnBotSide && ball.y < 260 && ball.vy > 4 && Math.abs(ball.x - netX) < 70;
   if (tapeDefense) {
     moveSpeed *= isHard ? 1.45 : 1.35;
   }
 
-  const rawTarget = ballOnBotSide ? Math.min(targetWhenOnSide, rightLimit - wallBuffer) : targetWhenOffSide;
+  return { moveSpeed, tapeDefense, baseMove };
+}
+
+function updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, isHard, netX, leftLimit, rightLimit) {
+  const center = bot.x + bot.w / 2;
+  const homeX = isHard ? 700 : 640;
+  
+  const smoothTarget = (current, target, blend = 0.16) => current * (1 - blend) + target * blend;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const baseWallBuffer = isHard ? 70 : 2;
+  const defensiveChase = ballOnBotSide && !botSpikeIntent && ball.y > 260 && ball.vy > 0;
+  const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
+
+  const deepDefense = ballOnBotSide && (predictedX > 760 || ball.x > 780);
+  const { moveSpeed, tapeDefense, baseMove } = calculateBotMoveSpeed(bot, ball, ballOnBotSide, predictedX, isHard, deepDefense, netX);
+
+  const rawTarget = ballOnBotSide ? Math.min(predictedX, rightLimit - wallBuffer) : homeX;
   const retreatingDeep = ballOnBotSide && predictedX > center + 80 && !botSpikeIntent;
   const blend = deepDefense ? 0.3 : (retreatingDeep ? 0.28 : 0.2);
   bot._tx = smoothTarget(bot._tx, rawTarget, blend);
@@ -2409,7 +2384,6 @@ function botLogic(bot) {
   if (retreatingDeep) accelLimit += isHard ? 0.12 : 0.08;
   if (!ballOnBotSide && ball.vx > 1.8 && ball.y < 360) {
     accelLimit += isHard ? 0.08 : 0.05;
-    moveSpeed *= isHard ? 1.08 : 1.04;
   }
   const accel = clamp(desiredVel - bot._vx, -accelLimit, accelLimit);
   bot._vx = clamp(bot._vx + accel, -moveSpeed, moveSpeed);
@@ -2417,7 +2391,6 @@ function botLogic(bot) {
 
   bot.x = Math.min(Math.max(bot.x, leftLimit), rightLimit);
 
-  // Gentle pull toward spike contact when committed (reduce jitter)
   if (botSpikeIntent && ballOnBotSide) {
     const aim = targetSpikeX;
     const pull = baseMove * 0.7;
@@ -2425,17 +2398,16 @@ function botLogic(bot) {
     else if (center > aim + 8) bot.x -= pull;
     bot.x = Math.min(Math.max(bot.x, leftLimit), rightLimit);
   }
+}
 
-  // ------------------------------
-  // JUMP LOGIC (uses predicted spike X)
-  // ------------------------------
-  const inFront = targetSpikeX > bot.x + 6; // ensure ball is truly ahead
-  const nearNet = bot.x < 600; // bias closer to net before jumping
-  const closeX = Math.abs(center - targetSpikeX) < (isHard ? 230 : 200); // approach window
+function shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver) {
+  const center = bot.x + bot.w / 2;
+  const inFront = targetSpikeX > bot.x + 6;
+  const nearNet = bot.x < 600;
+  const closeX = Math.abs(center - targetSpikeX) < (isHard ? 230 : 200);
 
   const touches = bot.side === "right" ? ball.rightTouches : ball.leftTouches;
 
-  // Simpler rule: only go for a spike after at least one prior touch
   const wantsToSpike =
     !isServe &&
     ballOnBotSide &&
@@ -2449,6 +2421,12 @@ function botLogic(bot) {
     ball.y > 90 &&
     ball.vy < (isHard ? 8.0 : 7.2) &&
     touches >= 1 && touches <= 2;
+
+  return wantsToSpike;
+}
+
+function updateBotJumpAndGravity(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver) {
+  const wantsToSpike = shouldBotJumpForSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver);
 
   if (wantsToSpike) {
     botSpikeIntent = true;
@@ -2464,19 +2442,9 @@ function botLogic(bot) {
     bot.vy = 0;
     botSpikeIntent = false;
   }
+}
 
-  // ------------------------------
-  // HIT LOGIC
-  // ------------------------------
-  // Short per-bot interaction cooldown to avoid tethering the ball (longer right after bot's own set)
-  const lastBotHit = bot._lastHitFrameAny || -999;
-  const recentSelfSet = ball.lastTouchedSide === bot.side && ball.lastTouchType === "set";
-  const minHitCooldown = recentSelfSet ? 6 : 3;
-  if (frameCount - lastBotHit < minHitCooldown) return;
-
-  if (touches >= 3) return;
-
-  // Near-net rescue: if first touch and the ball is hovering by the tape, just receive upward so it doesn't drop
+function handleBotEmergencyReceives(bot, ball, ballOnBotSide, touches, grounded, netX, homeX) {
   if (
     touches === 0 &&
     ballOnBotSide &&
@@ -2487,10 +2455,9 @@ function botLogic(bot) {
   ) {
     ball.interact(bot, "receive");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
-  // Net feint safety: if ball is hovering near the net on our side, just receive it upward and reset
   if (
     ballOnBotSide &&
     Math.abs(ball.x - netX) < 34 &&
@@ -2502,10 +2469,9 @@ function botLogic(bot) {
     ball.interact(bot, "receive");
     bot._lastHitFrameAny = frameCount;
     bot._tx = homeX;
-    return;
+    return true;
   }
 
-  // Panic receive on late, falling balls so the bot doesn't watch its own set drop
   if (
     ballOnBotSide &&
     touches >= 1 &&
@@ -2515,16 +2481,15 @@ function botLogic(bot) {
   ) {
     ball.interact(bot, "receive");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
-  const closeEnough = Math.abs(center - targetSpikeX) < (isHard ? 165 : 138); // moderate swing window
-  // extra forgiveness when airborne and committed
-  const swingForgiveness = (botSpikeIntent && !grounded) ? (isHard ? 34 : 28) : (isHard ? 22 : 16);
-  const earlyForgiveness = touches <= 1 ? (isHard ? 48 : 36) : 0;
-  const closeEnoughForgiven = Math.abs(center - targetSpikeX) < (138 + swingForgiveness + earlyForgiveness);
+  return false;
+}
 
-  // Require reasonable proximity and a descending ball before auto second-touch set to avoid ghost re-sets
+function handleBotDefensiveReceive(bot, ball, ballOnBotSide, touches, grounded) {
+  const center = bot.x + bot.w / 2;
+  
   const withinReach =
     Math.abs(center - ball.x) < 120 &&
     Math.abs(bot.y - ball.y) < 120 &&
@@ -2532,40 +2497,24 @@ function botLogic(bot) {
     ball.vy > -0.8 &&
     ball.y > 200;
 
-  // Defensive receive fallback: if first touch and on our side, allow even if not perfectly in front/close
   if (!botSpikeIntent && touches === 0 && ballOnBotSide) {
     ball.interact(bot, "receive");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
-  // Ensure second touch happens even when target prediction is off
   if (!botSpikeIntent && touches === 1 && ballOnBotSide && withinReach) {
     ball.interact(bot, "set");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
-  if (!inFront || !closeEnoughForgiven) return;
+  return false;
+}
 
-  if (isServe) {
-    if (ballOnBotSide && ball.y > 230) {
-      ball.interact(bot, "receive");
-    }
-    return;
-  }
-
-  const ballIsLow  = ball.y > 300;
-  const ballIsMid  = ball.y > 230 && ball.y <= 300;
-  const ballIsHigh = ball.y <= 230;
-
-  // Serve reaction delay to add slight randomness to bot openings
-  if (isServe && ballOnBotSide && touches === 0 && botServeDelayFrames > 0) {
-    botServeDelayFrames -= 1;
-    return;
-  }
-
-  // 🔥 COMMITTED SPIKE WINDOW (tempered)
+function handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isHard) {
+  const center = bot.x + bot.w / 2;
+  
   if (
     botSpikeIntent &&
     ballOnBotSide &&
@@ -2573,9 +2522,8 @@ function botLogic(bot) {
     ball.y > 112 &&
     ball.y < 332 &&
     ball.vy <= (isHard ? 7.6 : 6.4) &&
-    spikeWallSafe // avoid spiking into wall
+    spikeWallSafe
   ) {
-    // Avoid tape: if ball is very close to net, give a tiny upward/side damp
     const nearNetBall = Math.abs(ball.x - 450) < 30;
     if (nearNetBall) {
       ball.vy -= 0.6;
@@ -2583,27 +2531,28 @@ function botLogic(bot) {
     }
     ball.interact(bot, "spike");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
-  // Prevent accidental mid-air touches during spike commit
-  if (botSpikeIntent) return;
+  return false;
+}
 
-  // Simplest touch plan: 1) receive, 2) set, 3) spike else receive
+function handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, touches, isHard, homeX) {
+  const center = bot.x + bot.w / 2;
+
   if (touches === 0) {
     ball.interact(bot, "receive");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
   if (touches === 1) {
     ball.interact(bot, "set");
     bot._lastHitFrameAny = frameCount;
-    return;
+    return true;
   }
 
   if (touches === 2) {
-    // Always try to finish on third touch; loosen spike window slightly
     if (
       ballOnBotSide &&
       Math.abs(center - targetSpikeX) < (isHard ? 245 : 220) &&
@@ -2614,19 +2563,92 @@ function botLogic(bot) {
     ) {
       ball.interact(bot, "spike");
     } else {
-      // If out of spike window, push it high and deep to buy time to reposition
       ball.interact(bot, "receive");
       const sendDir = bot.side === "right" ? -1 : 1;
       ball.vx = sendDir * 6.5;
       ball.vy = -7.5;
-      // Start retreating to home after a safe send
       bot._tx = homeX;
     }
     bot._lastHitFrameAny = frameCount;
+    return true;
+  }
+
+  return false;
+}
+
+// ==================== Main Bot Logic Function ====================
+
+function botLogic(bot) {
+  const netX = 450;
+  const leftLimit  = 455;
+  const rightLimit = canvas.width - bot.w;
+  const center = bot.x + bot.w / 2;
+  const isServe = (ball.lastTouchedSide === null);
+  const isHard = settings.botDifficulty === "hard";
+
+  const grounded = bot.y >= groundY - 0.1;
+  const cooldownOver = frameCount - botLastJumpFrame > (isHard ? 5 : 8);
+
+  const homeX = isHard ? 700 : 640;
+  const ballOnBotSide = ball.x > netX;
+
+  if (bot._vx === undefined) bot._vx = 0;
+  if (bot._tx === undefined) bot._tx = center;
+
+  const spikeX = predictBallSpikeContactX(ball);
+  let predictedX = predictBallLandingX(ball);
+  
+  const baseWallBuffer = isHard ? 70 : 2;
+  const defensiveChase = ballOnBotSide && !botSpikeIntent && ball.y > 260 && ball.vy > 0;
+  const wallBuffer = defensiveChase ? (isHard ? 30 : 28) : baseWallBuffer;
+  predictedX = Math.min(Math.max(predictedX, leftLimit + 10), rightLimit - wallBuffer);
+
+  const safeSpikeX = Math.min(spikeX, rightLimit - 70 - 12);
+  const targetSpikeX = isHard ? safeSpikeX : spikeX;
+  const baseSpikeWallMargin = isHard ? 98 : 22;
+  const spikeWallBoost = (ball.y < 220 || ball.vy < 3.2) ? (isHard ? 26 : 36) : 0;
+  const spikeWallSafe = targetSpikeX < rightLimit - (baseSpikeWallMargin + spikeWallBoost);
+
+  updateBotMovement(bot, ball, ballOnBotSide, predictedX, targetSpikeX, isHard, netX, leftLimit, rightLimit);
+  updateBotJumpAndGravity(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isServe, isHard, grounded, cooldownOver);
+
+  const lastBotHit = bot._lastHitFrameAny || -999;
+  const recentSelfSet = ball.lastTouchedSide === bot.side && ball.lastTouchType === "set";
+  const minHitCooldown = recentSelfSet ? 6 : 3;
+  if (frameCount - lastBotHit < minHitCooldown) return;
+
+  const touches = bot.side === "right" ? ball.rightTouches : ball.leftTouches;
+  if (touches >= 3) return;
+
+  if (handleBotEmergencyReceives(bot, ball, ballOnBotSide, touches, grounded, netX, homeX)) return;
+
+  const inFront = targetSpikeX > bot.x + 6;
+  const swingForgiveness = (botSpikeIntent && !grounded) ? (isHard ? 34 : 28) : (isHard ? 22 : 16);
+  const earlyForgiveness = touches <= 1 ? (isHard ? 48 : 36) : 0;
+  const closeEnoughForgiven = Math.abs(center - targetSpikeX) < (138 + swingForgiveness + earlyForgiveness);
+
+  if (handleBotDefensiveReceive(bot, ball, ballOnBotSide, touches, grounded)) return;
+
+  if (!inFront || !closeEnoughForgiven) return;
+
+  if (isServe) {
+    if (ballOnBotSide && ball.y > 230) {
+      ball.interact(bot, "receive");
+    }
     return;
   }
 
-  // Fallback
+  if (isServe && ballOnBotSide && touches === 0 && botServeDelayFrames > 0) {
+    botServeDelayFrames -= 1;
+    return;
+  }
+
+  if (handleBotCommittedSpike(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, isHard)) return;
+
+  if (botSpikeIntent) return;
+
+  if (handleBotTouchSequence(bot, ball, ballOnBotSide, targetSpikeX, spikeWallSafe, touches, isHard, homeX)) return;
+
   ball.interact(bot, "receive");
   bot._lastHitFrameAny = frameCount;
 }
