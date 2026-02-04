@@ -1847,11 +1847,9 @@ this.hitUsed = {
     if (this._applyFeint(player, type, grounded, dir, addCharge)) return;
     if (this._applyThirdHitReceiveSet(player, type, isThirdHit, dir, addCharge)) return;
     if (this._applyReceive(player, type, grounded, dir, addCharge)) return;
-    if (this._applySet(player, type, touches, dir, addCharge)) {
-      // Set doesn't return early, continues to bookkeeping
-    } else if (this._applySpike(player, type, sprinting, touches, isThirdHit, dir, addCharge)) {
-      // Spike doesn't return early, continues to bookkeeping
-    }
+    
+    this._applySet(player, type, touches, dir, addCharge);
+    this._applySpike(player, type, sprinting, touches, isThirdHit, dir, addCharge);
 
     this._finalBookkeeping(player, type);
 
