@@ -2255,12 +2255,12 @@ function drawSuperCharge(player) {
   const pct = Math.max(0, Math.min(1, current / threshold));
   const nearReady = pct >= 0.8;
 
-  const isCPU = player.isBot;
   const width = 200;
   const height = 10;
   const padding = 16;
 
-  const x = isCPU ? canvas.width - width - padding : 20;
+  // P1 super spike at top-left, P2 super spike at top-right
+  const x = player.side === "left" ? padding : canvas.width - width - padding;
   const y = padding;
 
   ctx.save();
