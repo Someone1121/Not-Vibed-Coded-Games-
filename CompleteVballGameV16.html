@@ -159,6 +159,16 @@ let p2SwordCooldown = 0;
 let p1Knockback = 0;
 let p2Knockback = 0;
 
+// ================== Nuke State ==================
+let nukeActive = false;
+let nukeFrame = 0;
+let nukeX = 0;
+let nukeY = 0;
+const NUKE_DURATION = 120; // 2 seconds at 60fps
+const NUKE_COOLDOWN = 300; // 5 seconds cooldown
+let nukeCooldown = 0;
+const NUKE_COST = 30; // Cost in coins to use nuke
+
 const settings = {
   fxParticles: true,
   fxTrails: true,
@@ -279,6 +289,19 @@ document.addEventListener("keydown", e => {
     coins -= SLOT_BET;
     slotResult = null;
     playSound("whoosh");
+    return;
+  }
+  
+  // Nuke activation (N key)
+  if (key === "n" && !paused && !gameOver && !slotMachineOpen && !nukeActive && nukeCooldown <= 0 && coins >= NUKE_COST) {
+    nukeActive = true;
+    nukeFrame = NUKE_DURATION;
+    nukeX = canvas.width / 2;
+    nukeY = canvas.height / 2;
+    nukeCooldown = NUKE_COOLDOWN;
+    coins -= NUKE_COST;
+    cameraShake = settings.screenShake ? 30 : 0;
+    playSound("superSpike");
     return;
   }
 
@@ -2178,7 +2201,7 @@ function drawKeybinds() {
   const y = 520 - 42; // align with stamina bar
   const x = staminaX + staminaWidth + 20;
 
-  const text = "W/A/D move | Q spike | E set | S receive | F dive | X sword | G slots | P pause";
+  const text = "W/A/D | Q spike | E set | S receive | F dive | X sword | N nuke | G slots | P pause";
   ctx.font = "12px 'Segoe UI', Arial";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -2516,6 +2539,141 @@ function drawCoinsDisplay() {
   ctx.font = "bold 16px Arial";
   ctx.textAlign = "right";
   ctx.fillText(`💰 ${coins}`, canvas.width - 20, 60);
+  ctx.restore();
+}
+
+// ================== Nuke Functions ==================
+function updateNuke() {
+  if (nukeCooldown > 0) nukeCooldown--;
+  
+  if (nukeActive) {
+    nukeFrame--;
+    
+    // Create massive particle burst during explosion
+    if (nukeFrame > NUKE_DURATION - 20) {
+      for (let i = 0; i < 8; i++) {
+        spawnBurst(nukeX + (Math.random() - 0.5) * 200, nukeY + (Math.random() - 0.5) * 150, 
+          { color: `rgba(255,${Math.floor(Math.random() * 200)},0,0.9)`, count: 8, spread: 2.5, speed: 6, gravity: 0.15, size: 8 });
+      }
+    }
+    
+    // Apply knockback to both players during explosion peak
+    if (nukeFrame > NUKE_DURATION - 30 && nukeFrame < NUKE_DURATION - 10) {
+      p1Knockback = 3;
+      p2Knockback = 3;
+      
+      // Affect the ball too
+      ball.vy = -15;
+      ball.vx = (Math.random() - 0.5) * 10;
+    }
+    
+    if (nukeFrame <= 0) {
+      nukeActive = false;
+    }
+  }
+}
+
+function drawNuke() {
+  if (!nukeActive) return;
+  
+  ctx.save();
+  
+  const progress = 1 - (nukeFrame / NUKE_DURATION);
+  const peakProgress = Math.sin(progress * Math.PI); // Peak at middle
+  
+  // Mushroom cloud effect
+  const cloudRadius = 50 + peakProgress * 250;
+  const stemHeight = peakProgress * 200;
+  
+  // Flash effect at start
+  if (nukeFrame > NUKE_DURATION - 10) {
+    ctx.fillStyle = `rgba(255,255,255,${0.8 * (nukeFrame - (NUKE_DURATION - 10)) / 10})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  
+  // Stem of mushroom cloud
+  const stemGrad = ctx.createLinearGradient(nukeX, nukeY, nukeX, nukeY + stemHeight);
+  stemGrad.addColorStop(0, `rgba(255,100,0,${0.8 * peakProgress})`);
+  stemGrad.addColorStop(0.5, `rgba(255,50,0,${0.6 * peakProgress})`);
+  stemGrad.addColorStop(1, `rgba(100,50,50,${0.4 * peakProgress})`);
+  ctx.fillStyle = stemGrad;
+  ctx.beginPath();
+  ctx.moveTo(nukeX - 30 * peakProgress, nukeY);
+  ctx.lineTo(nukeX + 30 * peakProgress, nukeY);
+  ctx.lineTo(nukeX + 50 * peakProgress, nukeY + stemHeight);
+  ctx.lineTo(nukeX - 50 * peakProgress, nukeY + stemHeight);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Main fireball
+  const fireGrad = ctx.createRadialGradient(nukeX, nukeY - 20, 0, nukeX, nukeY - 20, cloudRadius);
+  fireGrad.addColorStop(0, `rgba(255,255,200,${0.9 * peakProgress})`);
+  fireGrad.addColorStop(0.2, `rgba(255,200,50,${0.8 * peakProgress})`);
+  fireGrad.addColorStop(0.5, `rgba(255,100,0,${0.7 * peakProgress})`);
+  fireGrad.addColorStop(0.8, `rgba(200,50,0,${0.5 * peakProgress})`);
+  fireGrad.addColorStop(1, `rgba(100,0,0,0)`);
+  ctx.fillStyle = fireGrad;
+  ctx.beginPath();
+  ctx.arc(nukeX, nukeY - 20, cloudRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Mushroom cap
+  const capY = nukeY - 40 - peakProgress * 80;
+  const capGrad = ctx.createRadialGradient(nukeX, capY, 0, nukeX, capY, cloudRadius * 1.3);
+  capGrad.addColorStop(0, `rgba(255,150,50,${0.7 * peakProgress})`);
+  capGrad.addColorStop(0.4, `rgba(200,100,50,${0.6 * peakProgress})`);
+  capGrad.addColorStop(0.7, `rgba(150,80,80,${0.4 * peakProgress})`);
+  capGrad.addColorStop(1, `rgba(80,80,80,0)`);
+  ctx.fillStyle = capGrad;
+  ctx.beginPath();
+  ctx.ellipse(nukeX, capY, cloudRadius * 1.3, cloudRadius * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Shockwave ring
+  if (progress < 0.5) {
+    const ringRadius = progress * 2 * 400;
+    ctx.strokeStyle = `rgba(255,200,100,${0.6 * (1 - progress * 2)})`;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(nukeX, nukeY + 50, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  
+  // Nuke emoji in center
+  if (peakProgress > 0.3) {
+    ctx.font = `${40 + peakProgress * 30}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("☢️", nukeX, nukeY - 30);
+  }
+  
+  ctx.restore();
+}
+
+function drawNukeCooldown() {
+  if (nukeCooldown <= 0 && coins >= NUKE_COST) return;
+  
+  ctx.save();
+  const x = canvas.width - 130;
+  const y = 75;
+  
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(x, y, 120, 25);
+  
+  ctx.font = "12px Arial";
+  ctx.textAlign = "right";
+  
+  if (coins < NUKE_COST) {
+    ctx.fillStyle = "#FF6B6B";
+    ctx.fillText(`☢️ Need ${NUKE_COST} coins`, canvas.width - 20, y + 17);
+  } else if (nukeCooldown > 0) {
+    const pct = nukeCooldown / NUKE_COOLDOWN;
+    ctx.fillStyle = "#FFD700";
+    ctx.fillRect(x + 5, y + 5, 110 * (1 - pct), 15);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(`☢️ ${Math.ceil(nukeCooldown / 60)}s`, canvas.width - 20, y + 17);
+  }
+  
   ctx.restore();
 }
 
@@ -3168,6 +3326,9 @@ function restartGame() {
   p2SwordCooldown = 0;
   p1Knockback = 0;
   p2Knockback = 0;
+  // Reset nuke state
+  nukeActive = false;
+  nukeCooldown = 0;
 }
 
 document.addEventListener("keydown", e => {
@@ -3223,6 +3384,9 @@ function gameLoop(now) {
 
       // Update sword fighting
       updateSwordFighting();
+      
+      // Update nuke
+      updateNuke();
 
       // Game over condition
       if (p1.score >= settings.targetScore || p2.score >= settings.targetScore) {
@@ -3254,12 +3418,17 @@ function gameLoop(now) {
   drawSword(p2, p2SwordAttacking, p2SwordFrame, false);
   
   ball.draw();
+  
+  // Draw nuke effect (on top of everything except UI)
+  drawNuke();
+  
   drawScoreboard();
   drawStaminaBar(p1);
   drawSuperCharge(p1);
   drawSuperCharge(p2);
   drawKeybinds();
   drawCoinsDisplay();
+  drawNukeCooldown();
 
   if (gameOver) {
     drawGameOver();
