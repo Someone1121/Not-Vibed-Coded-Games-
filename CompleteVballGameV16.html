@@ -135,6 +135,40 @@ let cameraShake = 0;
 let paused = false;
 let masterVolume = 1;
 let botServeDelayFrames = 0;
+
+// ================== Slot Machine State ==================
+let slotMachineOpen = false;
+let coins = 100; // Starting coins
+let slotReels = [0, 0, 0]; // Current reel positions
+let slotSpinning = false;
+let slotSpinFrames = 0;
+let slotResult = null; // 'win', 'lose', or null
+const SLOT_SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '7️⃣'];
+const SLOT_BET = 10;
+
+// ================== Sword Fighting State ==================
+let p1SwordAttacking = false;
+let p1SwordFrame = 0;
+let p2SwordAttacking = false;
+let p2SwordFrame = 0;
+const SWORD_ATTACK_DURATION = 20;
+const SWORD_DAMAGE = 1;
+const SWORD_COOLDOWN = 30;
+let p1SwordCooldown = 0;
+let p2SwordCooldown = 0;
+let p1Knockback = 0;
+let p2Knockback = 0;
+
+// ================== Nuke State ==================
+let nukeActive = false;
+let nukeFrame = 0;
+let nukeX = 0;
+let nukeY = 0;
+const NUKE_DURATION = 120; // 2 seconds at 60fps
+const NUKE_COOLDOWN = 300; // 5 seconds cooldown
+let nukeCooldown = 0;
+const NUKE_COST = 30; // Cost in coins to use nuke
+
 const settings = {
   fxParticles: true,
   fxTrails: true,
@@ -228,9 +262,46 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (key === "p" || key === "escape") {
+    if (slotMachineOpen) {
+      slotMachineOpen = false;
+      return;
+    }
     paused = !paused;
     keys = {};
     lastTime = performance.now();
+    return;
+  }
+
+  // Slot machine controls
+  if (key === "g" && !paused && !gameOver) {
+    slotMachineOpen = !slotMachineOpen;
+    if (slotMachineOpen) {
+      slotSpinning = false;
+      slotResult = null;
+    }
+    return;
+  }
+  
+  // Spin slot machine with spacebar when slot machine is open
+  if (slotMachineOpen && key === " " && !slotSpinning && coins >= SLOT_BET) {
+    slotSpinning = true;
+    slotSpinFrames = 60; // Spin for 60 frames
+    coins -= SLOT_BET;
+    slotResult = null;
+    playSound("whoosh");
+    return;
+  }
+  
+  // Nuke activation (N key)
+  if (key === "n" && !paused && !gameOver && !slotMachineOpen && !nukeActive && nukeCooldown <= 0 && coins >= NUKE_COST) {
+    nukeActive = true;
+    nukeFrame = NUKE_DURATION;
+    nukeX = canvas.width / 2;
+    nukeY = canvas.height / 2;
+    nukeCooldown = NUKE_COOLDOWN;
+    coins -= NUKE_COST;
+    cameraShake = settings.screenShake ? 30 : 0;
+    playSound("superSpike");
     return;
   }
 
@@ -2130,7 +2201,7 @@ function drawKeybinds() {
   const y = 520 - 42; // align with stamina bar
   const x = staminaX + staminaWidth + 20;
 
-  const text = "W/A/D move & jump | Q spike | E set | S receive / feint (air) | F dive | Shift sprint | P/Esc pause | M mute";
+  const text = "W/A/D | Q spike | E set | S receive | F dive | X sword | N nuke | G slots | P pause";
   ctx.font = "12px 'Segoe UI', Arial";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -2145,6 +2216,464 @@ function drawKeybinds() {
   ctx.fillStyle = "white";
   ctx.fillText(text, x, y);
 
+  ctx.restore();
+}
+
+// ================== Slot Machine Drawing ==================
+function updateSlotMachine() {
+  if (slotSpinning && slotSpinFrames > 0) {
+    slotSpinFrames--;
+    // Randomize reels while spinning
+    for (let i = 0; i < 3; i++) {
+      if (slotSpinFrames > (20 - i * 8)) { // Stagger stopping
+        slotReels[i] = Math.floor(Math.random() * SLOT_SYMBOLS.length);
+      }
+    }
+    
+    if (slotSpinFrames <= 0) {
+      slotSpinning = false;
+      // Check for wins
+      if (slotReels[0] === slotReels[1] && slotReels[1] === slotReels[2]) {
+        // Three of a kind - big win!
+        const winAmount = SLOT_BET * 10;
+        coins += winAmount;
+        slotResult = 'jackpot';
+        playSound("superSpike");
+        cameraShake = settings.screenShake ? 12 : 0;
+      } else if (slotReels[0] === slotReels[1] || slotReels[1] === slotReels[2] || slotReels[0] === slotReels[2]) {
+        // Two of a kind - small win
+        const winAmount = SLOT_BET * 2;
+        coins += winAmount;
+        slotResult = 'win';
+        playSound("score");
+      } else {
+        slotResult = 'lose';
+        playSound("net");
+      }
+    }
+  }
+}
+
+function drawSlotMachine() {
+  if (!slotMachineOpen) return;
+  
+  ctx.save();
+  
+  // Darken background
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Slot machine frame
+  const machineX = canvas.width / 2 - 180;
+  const machineY = canvas.height / 2 - 120;
+  const machineW = 360;
+  const machineH = 240;
+  
+  // Machine body
+  const machineGrad = ctx.createLinearGradient(machineX, machineY, machineX, machineY + machineH);
+  machineGrad.addColorStop(0, "#8B0000");
+  machineGrad.addColorStop(0.5, "#DC143C");
+  machineGrad.addColorStop(1, "#8B0000");
+  ctx.fillStyle = machineGrad;
+  ctx.fillRect(machineX, machineY, machineW, machineH);
+  
+  // Gold border
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(machineX, machineY, machineW, machineH);
+  
+  // Title
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 28px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🎰 LUCKY SLOTS 🎰", canvas.width / 2, machineY + 35);
+  
+  // Reel display area
+  const reelY = machineY + 55;
+  const reelH = 80;
+  ctx.fillStyle = "#1a1a2e";
+  ctx.fillRect(machineX + 20, reelY, machineW - 40, reelH);
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(machineX + 20, reelY, machineW - 40, reelH);
+  
+  // Draw reels
+  ctx.font = "48px Arial";
+  ctx.textBaseline = "middle";
+  const reelWidth = (machineW - 60) / 3;
+  for (let i = 0; i < 3; i++) {
+    const symbolX = machineX + 40 + i * reelWidth + reelWidth / 2;
+    const symbol = SLOT_SYMBOLS[slotReels[i]];
+    
+    // Add spinning effect
+    if (slotSpinning && slotSpinFrames > (20 - i * 8)) {
+      ctx.save();
+      ctx.translate(symbolX, reelY + reelH / 2);
+      ctx.rotate(frameCount * 0.3);
+      ctx.fillText(symbol, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(symbol, symbolX, reelY + reelH / 2);
+    }
+    
+    // Divider lines
+    if (i < 2) {
+      ctx.strokeStyle = "#FFD700";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(machineX + 30 + (i + 1) * reelWidth, reelY + 5);
+      ctx.lineTo(machineX + 30 + (i + 1) * reelWidth, reelY + reelH - 5);
+      ctx.stroke();
+    }
+  }
+  
+  // Coins display
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 20px Arial";
+  ctx.fillText(`💰 Coins: ${coins}`, canvas.width / 2, reelY + reelH + 30);
+  
+  // Bet info
+  ctx.fillStyle = "#fff";
+  ctx.font = "16px Arial";
+  ctx.fillText(`Bet: ${SLOT_BET} coins per spin`, canvas.width / 2, reelY + reelH + 55);
+  
+  // Result message
+  if (slotResult) {
+    ctx.font = "bold 24px Arial";
+    if (slotResult === 'jackpot') {
+      ctx.fillStyle = "#FFD700";
+      ctx.fillText(`🎉 JACKPOT! +${SLOT_BET * 10} coins! 🎉`, canvas.width / 2, reelY + reelH + 85);
+    } else if (slotResult === 'win') {
+      ctx.fillStyle = "#90EE90";
+      ctx.fillText(`✨ WIN! +${SLOT_BET * 2} coins! ✨`, canvas.width / 2, reelY + reelH + 85);
+    } else {
+      ctx.fillStyle = "#FF6B6B";
+      ctx.fillText("Try again!", canvas.width / 2, reelY + reelH + 85);
+    }
+  }
+  
+  // Instructions
+  ctx.fillStyle = "#fff";
+  ctx.font = "14px Arial";
+  const canSpin = coins >= SLOT_BET && !slotSpinning;
+  if (canSpin) {
+    ctx.fillText("Press SPACE to spin! | Press G or ESC to close", canvas.width / 2, machineY + machineH - 15);
+  } else if (slotSpinning) {
+    ctx.fillText("Spinning...", canvas.width / 2, machineY + machineH - 15);
+  } else {
+    ctx.fillStyle = "#FF6B6B";
+    ctx.fillText("Not enough coins! | Press G or ESC to close", canvas.width / 2, machineY + machineH - 15);
+  }
+  
+  ctx.restore();
+}
+
+// ================== Sword Fighting Functions ==================
+function updateSwordFighting() {
+  // Update cooldowns
+  if (p1SwordCooldown > 0) p1SwordCooldown--;
+  if (p2SwordCooldown > 0) p2SwordCooldown--;
+  
+  // Update knockback
+  if (p1Knockback > 0) {
+    p1.x -= 4;
+    p1Knockback--;
+    p1.x = Math.max(0, p1.x);
+  }
+  if (p2Knockback > 0) {
+    p2.x += 4;
+    p2Knockback--;
+    p2.x = Math.min(canvas.width - p2.w, p2.x);
+  }
+  
+  // Player 1 sword attack (X key)
+  if (keys["x"] && !p1SwordAttacking && p1SwordCooldown <= 0 && !slotMachineOpen) {
+    p1SwordAttacking = true;
+    p1SwordFrame = SWORD_ATTACK_DURATION;
+    p1SwordCooldown = SWORD_COOLDOWN;
+    playSound("spike");
+  }
+  
+  // Update player 1 sword attack
+  if (p1SwordAttacking) {
+    p1SwordFrame--;
+    if (p1SwordFrame <= 0) {
+      p1SwordAttacking = false;
+    } else if (p1SwordFrame > SWORD_ATTACK_DURATION - 8) {
+      // Check for hit on opponent during swing
+      const swordReach = 70;
+      const swordX = p1.x + p1.w + swordReach;
+      const swordY = p1.y + p1.h / 2;
+      
+      if (swordX > p2.x && p1.x + p1.w < p2.x + p2.w &&
+          Math.abs(swordY - (p2.y + p2.h / 2)) < 60) {
+        // Hit!
+        p2Knockback = 8;
+        spawnBurst(p2.x, p2.y + p2.h / 2, { color: "rgba(255,100,100,0.9)", count: 15, spread: 2, speed: 4, gravity: 0.3, size: 5 });
+        playSound("superSpike");
+        cameraShake = settings.screenShake ? 8 : 0;
+        p1SwordFrame = 0; // End attack after hit
+        p1SwordAttacking = false;
+      }
+    }
+  }
+  
+  // Bot sword attack (random chance when close to player)
+  if (!p2SwordAttacking && p2SwordCooldown <= 0 && !slotMachineOpen) {
+    const distToPlayer = p2.x - (p1.x + p1.w);
+    if (distToPlayer < 100 && distToPlayer > 0 && Math.random() < 0.02) {
+      p2SwordAttacking = true;
+      p2SwordFrame = SWORD_ATTACK_DURATION;
+      p2SwordCooldown = SWORD_COOLDOWN + 20; // Bot has longer cooldown
+      playSound("spike");
+    }
+  }
+  
+  // Update bot sword attack
+  if (p2SwordAttacking) {
+    p2SwordFrame--;
+    if (p2SwordFrame <= 0) {
+      p2SwordAttacking = false;
+    } else if (p2SwordFrame > SWORD_ATTACK_DURATION - 8) {
+      // Check for hit on player during swing
+      const swordReach = 70;
+      const swordX = p2.x - swordReach;
+      const swordY = p2.y + p2.h / 2;
+      
+      if (swordX < p1.x + p1.w && p2.x > p1.x &&
+          Math.abs(swordY - (p1.y + p1.h / 2)) < 60) {
+        // Hit!
+        p1Knockback = 8;
+        spawnBurst(p1.x + p1.w, p1.y + p1.h / 2, { color: "rgba(255,100,100,0.9)", count: 15, spread: 2, speed: 4, gravity: 0.3, size: 5 });
+        playSound("superSpike");
+        cameraShake = settings.screenShake ? 8 : 0;
+        p2SwordFrame = 0; // End attack after hit
+        p2SwordAttacking = false;
+      }
+    }
+  }
+}
+
+function drawSword(player, attacking, attackFrame, isLeft) {
+  if (!attacking && p1SwordCooldown <= 0 && player === p1) return;
+  if (!attacking && p2SwordCooldown <= 0 && player === p2) return;
+  
+  ctx.save();
+  
+  const cx = player.x + player.w / 2;
+  const cy = player.y + player.h / 2 - 10;
+  
+  // Calculate sword angle based on attack phase
+  let angle;
+  const progress = 1 - (attackFrame / SWORD_ATTACK_DURATION);
+  
+  if (isLeft) {
+    // Player 1 swings right
+    if (attacking) {
+      angle = -Math.PI / 2 + progress * Math.PI; // Swing from top to bottom-right
+    } else {
+      angle = 0; // Resting position
+    }
+  } else {
+    // CPU swings left
+    if (attacking) {
+      angle = -Math.PI / 2 - progress * Math.PI; // Swing from top to bottom-left
+    } else {
+      angle = Math.PI; // Resting position
+    }
+  }
+  
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  
+  // Sword blade
+  const bladeLength = 55;
+  const bladeWidth = 8;
+  
+  // Blade gradient
+  const bladeGrad = ctx.createLinearGradient(0, 0, bladeLength, 0);
+  bladeGrad.addColorStop(0, "#C0C0C0");
+  bladeGrad.addColorStop(0.5, "#FFFFFF");
+  bladeGrad.addColorStop(1, "#A0A0A0");
+  
+  ctx.fillStyle = bladeGrad;
+  ctx.beginPath();
+  ctx.moveTo(10, -bladeWidth / 2);
+  ctx.lineTo(bladeLength, 0);
+  ctx.lineTo(10, bladeWidth / 2);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Blade outline
+  ctx.strokeStyle = "#404040";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  
+  // Handle
+  ctx.fillStyle = "#8B4513";
+  ctx.fillRect(-5, -4, 18, 8);
+  
+  // Guard
+  ctx.fillStyle = "#FFD700";
+  ctx.fillRect(8, -8, 4, 16);
+  
+  // Attack trail effect
+  if (attacking && attackFrame > SWORD_ATTACK_DURATION - 10) {
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = isLeft ? "#4169E1" : "#DC143C";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, bladeLength - 5, -Math.PI / 4, Math.PI / 4);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+
+function drawCoinsDisplay() {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(canvas.width - 130, 40, 120, 30);
+  
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "right";
+  ctx.fillText(`💰 ${coins}`, canvas.width - 20, 60);
+  ctx.restore();
+}
+
+// ================== Nuke Functions ==================
+function updateNuke() {
+  if (nukeCooldown > 0) nukeCooldown--;
+  
+  if (nukeActive) {
+    nukeFrame--;
+    
+    // Create massive particle burst during explosion
+    if (nukeFrame > NUKE_DURATION - 20) {
+      for (let i = 0; i < 8; i++) {
+        spawnBurst(nukeX + (Math.random() - 0.5) * 200, nukeY + (Math.random() - 0.5) * 150, 
+          { color: `rgba(255,${Math.floor(Math.random() * 200)},0,0.9)`, count: 8, spread: 2.5, speed: 6, gravity: 0.15, size: 8 });
+      }
+    }
+    
+    // Apply knockback to both players during explosion peak
+    if (nukeFrame > NUKE_DURATION - 30 && nukeFrame < NUKE_DURATION - 10) {
+      p1Knockback = 3;
+      p2Knockback = 3;
+      
+      // Affect the ball too
+      ball.vy = -15;
+      ball.vx = (Math.random() - 0.5) * 10;
+    }
+    
+    if (nukeFrame <= 0) {
+      nukeActive = false;
+    }
+  }
+}
+
+function drawNuke() {
+  if (!nukeActive) return;
+  
+  ctx.save();
+  
+  const progress = 1 - (nukeFrame / NUKE_DURATION);
+  const peakProgress = Math.sin(progress * Math.PI); // Peak at middle
+  
+  // Mushroom cloud effect
+  const cloudRadius = 50 + peakProgress * 250;
+  const stemHeight = peakProgress * 200;
+  
+  // Flash effect at start
+  if (nukeFrame > NUKE_DURATION - 10) {
+    ctx.fillStyle = `rgba(255,255,255,${0.8 * (nukeFrame - (NUKE_DURATION - 10)) / 10})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  
+  // Stem of mushroom cloud
+  const stemGrad = ctx.createLinearGradient(nukeX, nukeY, nukeX, nukeY + stemHeight);
+  stemGrad.addColorStop(0, `rgba(255,100,0,${0.8 * peakProgress})`);
+  stemGrad.addColorStop(0.5, `rgba(255,50,0,${0.6 * peakProgress})`);
+  stemGrad.addColorStop(1, `rgba(100,50,50,${0.4 * peakProgress})`);
+  ctx.fillStyle = stemGrad;
+  ctx.beginPath();
+  ctx.moveTo(nukeX - 30 * peakProgress, nukeY);
+  ctx.lineTo(nukeX + 30 * peakProgress, nukeY);
+  ctx.lineTo(nukeX + 50 * peakProgress, nukeY + stemHeight);
+  ctx.lineTo(nukeX - 50 * peakProgress, nukeY + stemHeight);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Main fireball
+  const fireGrad = ctx.createRadialGradient(nukeX, nukeY - 20, 0, nukeX, nukeY - 20, cloudRadius);
+  fireGrad.addColorStop(0, `rgba(255,255,200,${0.9 * peakProgress})`);
+  fireGrad.addColorStop(0.2, `rgba(255,200,50,${0.8 * peakProgress})`);
+  fireGrad.addColorStop(0.5, `rgba(255,100,0,${0.7 * peakProgress})`);
+  fireGrad.addColorStop(0.8, `rgba(200,50,0,${0.5 * peakProgress})`);
+  fireGrad.addColorStop(1, `rgba(100,0,0,0)`);
+  ctx.fillStyle = fireGrad;
+  ctx.beginPath();
+  ctx.arc(nukeX, nukeY - 20, cloudRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Mushroom cap
+  const capY = nukeY - 40 - peakProgress * 80;
+  const capGrad = ctx.createRadialGradient(nukeX, capY, 0, nukeX, capY, cloudRadius * 1.3);
+  capGrad.addColorStop(0, `rgba(255,150,50,${0.7 * peakProgress})`);
+  capGrad.addColorStop(0.4, `rgba(200,100,50,${0.6 * peakProgress})`);
+  capGrad.addColorStop(0.7, `rgba(150,80,80,${0.4 * peakProgress})`);
+  capGrad.addColorStop(1, `rgba(80,80,80,0)`);
+  ctx.fillStyle = capGrad;
+  ctx.beginPath();
+  ctx.ellipse(nukeX, capY, cloudRadius * 1.3, cloudRadius * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Shockwave ring
+  if (progress < 0.5) {
+    const ringRadius = progress * 2 * 400;
+    ctx.strokeStyle = `rgba(255,200,100,${0.6 * (1 - progress * 2)})`;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(nukeX, nukeY + 50, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  
+  // Nuke emoji in center
+  if (peakProgress > 0.3) {
+    ctx.font = `${40 + peakProgress * 30}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("☢️", nukeX, nukeY - 30);
+  }
+  
+  ctx.restore();
+}
+
+function drawNukeCooldown() {
+  if (nukeCooldown <= 0 && coins >= NUKE_COST) return;
+  
+  ctx.save();
+  const x = canvas.width - 130;
+  const y = 75;
+  
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(x, y, 120, 25);
+  
+  ctx.font = "12px Arial";
+  ctx.textAlign = "right";
+  
+  if (coins < NUKE_COST) {
+    ctx.fillStyle = "#FF6B6B";
+    ctx.fillText(`☢️ Need ${NUKE_COST} coins`, canvas.width - 20, y + 17);
+  } else if (nukeCooldown > 0) {
+    const pct = nukeCooldown / NUKE_COOLDOWN;
+    ctx.fillStyle = "#FFD700";
+    ctx.fillRect(x + 5, y + 5, 110 * (1 - pct), 15);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(`☢️ ${Math.ceil(nukeCooldown / 60)}s`, canvas.width - 20, y + 17);
+  }
+  
   ctx.restore();
 }
 
@@ -2713,6 +3242,7 @@ function botLogic(bot) {
 
 // ================== Game Loop ==================
 let gameOver = false;
+let coinsAwarded = false;
 
 
 
@@ -2720,6 +3250,14 @@ function drawGameOver() {
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Award coins for winning (only once per game)
+  if (!coinsAwarded) {
+    if (p1.score > p2.score) {
+      coins += 50; // Reward for winning
+    }
+    coinsAwarded = true;
+  }
 
   ctx.fillStyle = "white";
   ctx.font = "40px Arial";
@@ -2729,7 +3267,14 @@ function drawGameOver() {
   ctx.fillText(winner, 325, 260);
   ctx.font = "18px Arial";
   ctx.fillText(`First to ${settings.targetScore}`, 360, 292);
-  ctx.fillText("Press R to restart", 360, 318);
+  if (p1.score > p2.score) {
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText("+50 coins!", 360, 310);
+    ctx.fillStyle = "white";
+    ctx.fillText("Press R to restart", 360, 336);
+  } else {
+    ctx.fillText("Press R to restart", 360, 318);
+  }
   ctx.restore();
 }
 
@@ -2773,6 +3318,17 @@ function restartGame() {
   ball.reset();
   resetPositions();
   gameOver = false;
+  coinsAwarded = false;
+  // Reset sword states
+  p1SwordAttacking = false;
+  p2SwordAttacking = false;
+  p1SwordCooldown = 0;
+  p2SwordCooldown = 0;
+  p1Knockback = 0;
+  p2Knockback = 0;
+  // Reset nuke state
+  nukeActive = false;
+  nukeCooldown = 0;
 }
 
 document.addEventListener("keydown", e => {
@@ -2826,11 +3382,20 @@ function gameLoop(now) {
 
       botLogic(p2);
 
+      // Update sword fighting
+      updateSwordFighting();
+      
+      // Update nuke
+      updateNuke();
+
       // Game over condition
       if (p1.score >= settings.targetScore || p2.score >= settings.targetScore) {
         gameOver = true;
       }
     }
+    
+    // Update slot machine (works even when game is paused/over)
+    updateSlotMachine();
 
     updateFX();
     accumulator -= STEP;
@@ -2847,18 +3412,32 @@ function gameLoop(now) {
   drawNet();
   p1.draw();
   p2.draw();
+  
+  // Draw swords
+  drawSword(p1, p1SwordAttacking, p1SwordFrame, true);
+  drawSword(p2, p2SwordAttacking, p2SwordFrame, false);
+  
   ball.draw();
+  
+  // Draw nuke effect (on top of everything except UI)
+  drawNuke();
+  
   drawScoreboard();
   drawStaminaBar(p1);
   drawSuperCharge(p1);
   drawSuperCharge(p2);
   drawKeybinds();
+  drawCoinsDisplay();
+  drawNukeCooldown();
 
   if (gameOver) {
     drawGameOver();
   } else if (paused) {
     drawPauseOverlay();
   }
+  
+  // Draw slot machine overlay (on top of everything)
+  drawSlotMachine();
 
   requestAnimationFrame(gameLoop);
 }
