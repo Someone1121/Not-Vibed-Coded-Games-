@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Volleyball Game 3.0</title>
   <style>
     body {
@@ -8,21 +9,126 @@
       background: radial-gradient(circle at 20% 20%, #8fd4ff 0%, #5aa7f5 35%, #245f9a 100%);
       font-family: 'Segoe UI', Arial, sans-serif;
     }
+    #game-container {
+      position: relative;
+      width: min(1200px, 96vw);
+      margin: 16px auto 28px auto;
+    }
     canvas {
       display: block;
-      margin: 16px auto 28px auto;
-      width: min(1200px, 96vw);
+      width: 100%;
       aspect-ratio: 9 / 5;
       height: auto;
       background: #0a1b2a;
       border-radius: 14px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05);
     }
+    #gui-buttons {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+    }
+    .gui-btn {
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      min-width: 100px;
+    }
+    .gui-btn:hover {
+      transform: scale(1.05);
+      border-color: rgba(255,255,255,0.8);
+    }
+    .gui-btn:active {
+      transform: scale(0.95);
+    }
+    #btn-shop { background: linear-gradient(135deg, #4CAF50, #2E7D32); color: white; }
+    #btn-casino { background: linear-gradient(135deg, #9C27B0, #6A1B9A); color: white; }
+    #btn-chemistry { background: linear-gradient(135deg, #00BCD4, #0097A7); color: white; }
+    #btn-caterpillar { background: linear-gradient(135deg, #8BC34A, #558B2F); color: white; }
+    #btn-arena { background: linear-gradient(135deg, #F44336, #C62828); color: white; }
+    #btn-simulation { background: linear-gradient(135deg, #FF9800, #E65100); color: white; }
+    #btn-feed { background: linear-gradient(135deg, #CDDC39, #9E9D24); color: #333; display: none; }
+    
+    #coins-display {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: linear-gradient(135deg, #FFD700, #FFA000);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      color: #333;
+      border: 2px solid rgba(255,255,255,0.5);
+      z-index: 100;
+    }
+    
+    #bottom-controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    .control-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #333, #555);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .control-btn:hover {
+      background: linear-gradient(135deg, #444, #666);
+      border-color: rgba(255,255,255,0.6);
+    }
+    #btn-3d { background: linear-gradient(135deg, #2196F3, #1565C0); color: white; }
+    #btn-3d.active { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+    #btn-algebra { background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: white; }
+    #btn-topology { background: linear-gradient(135deg, #E91E63, #C2185B); color: white; }
+    #btn-analysis { background: linear-gradient(135deg, #3F51B5, #303F9F); color: white; }
   </style>
 </head>
 <body>
 
-<canvas id="game" width="900" height="500"></canvas>
+<div id="game-container">
+  <canvas id="game" width="900" height="500"></canvas>
+  
+  <div id="coins-display">💰 Coins: <span id="coin-count">100</span></div>
+  
+  <div id="gui-buttons">
+    <button class="gui-btn" id="btn-3d" onclick="toggle3DBtn()">🎮 3D Mode</button>
+    <button class="gui-btn" id="btn-shop" onclick="toggleShop()">🛒 Shop</button>
+    <button class="gui-btn" id="btn-casino" onclick="toggleCasino()">🎰 Casino</button>
+    <button class="gui-btn" id="btn-chemistry" onclick="toggleChemistry()">⚗️ Chemistry</button>
+    <button class="gui-btn" id="btn-algebra" onclick="toggleAlgebraicGeometry()">📐 Alg. Geometry</button>
+    <button class="gui-btn" id="btn-topology" onclick="toggleTopology()">🔮 Topology</button>
+    <button class="gui-btn" id="btn-analysis" onclick="toggleFunctionalAnalysis()">∫ Analysis</button>
+    <button class="gui-btn" id="btn-caterpillar" onclick="toggleCaterpillar()">🐛 Caterpillar</button>
+    <button class="gui-btn" id="btn-feed" onclick="feedCaterpillarBtn()">🍎 Feed</button>
+    <button class="gui-btn" id="btn-arena" onclick="switchToArena()">⚔️ Arena</button>
+    <button class="gui-btn" id="btn-simulation" onclick="switchToSim()">🌍 World Sim</button>
+  </div>
+  
+  <div id="bottom-controls">
+    <button class="control-btn" onclick="restartGame()">🔄 Restart</button>
+    <button class="control-btn" onclick="togglePause()">⏸️ Pause</button>
+  </div>
+</div>
 
 <script>
 // ================== Core Setup ==================
@@ -146,6 +252,2235 @@ const settings = {
   targetScore: 10,
   mapIndex: 0
 };
+
+// ================== Extended Game State ==================
+let gameMode = "volleyball"; // "volleyball", "arena", "simulation", "chemistry"
+let showingShop = false;
+let showingGambling = false;
+let showingChemistry = false;
+
+// Currency & Gambling System
+const playerStats = {
+  coins: 100,
+  totalWins: 0,
+  totalLosses: 0,
+  currentBet: 0,
+  slotSpinning: false,
+  slotResults: [0, 0, 0],
+  lastDiceRoll: 0
+};
+
+// Power-Up Shop System
+const shopItems = [
+  { id: "speedBoost", name: "Speed Boost", cost: 50, duration: 600, description: "+35% speed", active: false, timer: 0 },
+  { id: "jumpBoost", name: "Jump Boost", cost: 40, duration: 600, description: "+25% jump", active: false, timer: 0 },
+  { id: "staminaRegen", name: "Stamina Regen", cost: 30, duration: 900, description: "2x stamina regen", active: false, timer: 0 },
+  { id: "giantBall", name: "Giant Ball", cost: 60, duration: 450, description: "Ball is 50% bigger", active: false, timer: 0 },
+  { id: "slowCPU", name: "Slow CPU", cost: 75, duration: 600, description: "CPU 30% slower", active: false, timer: 0 },
+  { id: "autoReceive", name: "Auto Receive", cost: 100, duration: 300, description: "Auto-catch nearby balls", active: false, timer: 0 }
+];
+
+// Arena Battle System (Super Smash Bros Style)
+const arenaState = {
+  active: false,
+  playerStocks: 3,
+  cpuStocks: 3,
+  playerDamage: 0, // Percentage damage (affects knockback)
+  cpuDamage: 0,
+  weapons: [],
+  items: [],
+  currentWeapon: null,
+  cpuWeapon: null,
+  attackCooldown: 0,
+  cpuAttackCooldown: 0,
+  playerSpecialCharge: 0,
+  cpuSpecialCharge: 0,
+  comboCount: 0,
+  lastHitTime: 0,
+  platforms: [
+    { x: 200, y: 320, w: 150, h: 15 },
+    { x: 550, y: 320, w: 150, h: 15 },
+    { x: 375, y: 220, w: 150, h: 15 }
+  ],
+  projectiles: [],
+  respawnTimer: 0,
+  cpuRespawnTimer: 0,
+  screenKO: null, // For dramatic KO effects
+  announcer: null
+};
+
+const weaponTypes = [
+  { id: "sword", name: "Sword", damage: 12, knockback: 10, range: 70, cooldown: 20, color: "#C0C0C0", swingArc: true },
+  { id: "hammer", name: "Hammer", damage: 28, knockback: 25, range: 50, cooldown: 45, color: "#8B4513", smashAttack: true },
+  { id: "bow", name: "Bow", damage: 8, knockback: 6, range: 300, cooldown: 35, color: "#DEB887", projectile: true },
+  { id: "bomb", name: "Bomb", damage: 22, knockback: 30, range: 100, cooldown: 60, color: "#333", explosive: true, throwable: true },
+  { id: "staff", name: "Magic Staff", damage: 15, knockback: 12, range: 200, cooldown: 30, color: "#9932CC", projectile: true, magic: true },
+  { id: "bat", name: "Home Run Bat", damage: 35, knockback: 50, range: 60, cooldown: 80, color: "#8B0000", homeRun: true },
+  { id: "fan", name: "Fan", damage: 3, knockback: 2, range: 40, cooldown: 5, color: "#FFD700", rapidFire: true }
+];
+
+const smashItems = [
+  { id: "heart", name: "Heart", effect: "heal", value: 30, color: "#FF69B4" },
+  { id: "star", name: "Star", effect: "invincible", duration: 300, color: "#FFD700" },
+  { id: "mushroom", name: "Mushroom", effect: "grow", duration: 400, color: "#FF0000" },
+  { id: "lightning", name: "Lightning", effect: "shrinkEnemy", duration: 350, color: "#FFFF00" }
+];
+
+// Special moves for each character
+const specialMoves = {
+  player: {
+    neutral: { name: "Energy Ball", damage: 12, knockback: 8, charge: 25 },
+    side: { name: "Dash Attack", damage: 15, knockback: 12, charge: 20 },
+    up: { name: "Rising Strike", damage: 10, knockback: 15, charge: 30, recovery: true },
+    down: { name: "Ground Pound", damage: 18, knockback: 20, charge: 35 }
+  }
+};
+
+// Life Simulation System (WorldBox Style)
+const simState = {
+  active: false,
+  entities: [],
+  maxEntities: 50,
+  selectedTool: "spawn",
+  spawnType: "human",
+  godPowers: {
+    lightning: { cost: 10, cooldown: 0 },
+    rain: { cost: 5, cooldown: 0 },
+    earthquake: { cost: 20, cooldown: 0 },
+    blessing: { cost: 15, cooldown: 0 },
+    plague: { cost: 25, cooldown: 0 }
+  },
+  divineEnergy: 100,
+  maxDivineEnergy: 100
+};
+
+const entityTypes = [
+  { id: "human", name: "Human", color: "#FFD700", speed: 1.5, health: 50, hostile: false },
+  { id: "warrior", name: "Warrior", color: "#DC143C", speed: 1.2, health: 80, hostile: true, damage: 10 },
+  { id: "farmer", name: "Farmer", color: "#32CD32", speed: 1.0, health: 40, hostile: false, produces: "food" },
+  { id: "mage", name: "Mage", color: "#9400D3", speed: 1.3, health: 35, hostile: false, magic: true },
+  { id: "animal", name: "Animal", color: "#8B4513", speed: 2.0, health: 30, hostile: false },
+  { id: "monster", name: "Monster", color: "#800000", speed: 1.8, health: 100, hostile: true, damage: 20 }
+];
+
+// Evil Caterpillar System
+const caterpillar = {
+  active: false,
+  x: 100,
+  y: groundY + 50,
+  segments: 5,
+  maxSegments: 20,
+  hunger: 50,
+  maxHunger: 100,
+  foodEaten: 0,
+  targetOpponent: false,
+  attackDamage: 5,
+  growthThreshold: 3, // Food needed to grow
+  lastFedFrame: 0
+};
+
+// Chemistry System
+const chemistryState = {
+  active: false,
+  elements: [],
+  combinations: [],
+  discovered: ["hydrogen", "oxygen", "carbon", "nitrogen"],
+  currentMix: [],
+  craftingResult: null
+};
+
+const baseElements = [
+  { id: "hydrogen", symbol: "H", color: "#E8E8E8", description: "Lightest element" },
+  { id: "oxygen", symbol: "O", color: "#FF6B6B", description: "Essential for life" },
+  { id: "carbon", symbol: "C", color: "#333333", description: "Building block of life" },
+  { id: "nitrogen", symbol: "N", color: "#87CEEB", description: "78% of air" },
+  { id: "iron", symbol: "Fe", color: "#B8860B", description: "Strong metal" },
+  { id: "uranium", symbol: "U", color: "#00FF00", description: "Radioactive" },
+  { id: "gold", symbol: "Au", color: "#FFD700", description: "Precious metal" },
+  { id: "silicon", symbol: "Si", color: "#A0A0A0", description: "Computer chips" }
+];
+
+const chemistryRecipes = [
+  { inputs: ["hydrogen", "hydrogen", "oxygen"], output: "water", name: "Water", color: "#00BFFF" },
+  { inputs: ["carbon", "oxygen", "oxygen"], output: "co2", name: "Carbon Dioxide", color: "#808080" },
+  { inputs: ["nitrogen", "nitrogen", "nitrogen"], output: "ammonia", name: "Ammonia", color: "#FFFF00" },
+  { inputs: ["uranium", "uranium", "uranium"], output: "nuke", name: "Nuclear Bomb", color: "#FF0000" },
+  { inputs: ["hydrogen", "hydrogen", "hydrogen", "hydrogen"], output: "star", name: "Star", color: "#FFFF00" },
+  { inputs: ["star", "star", "star"], output: "galaxy", name: "Galaxy", color: "#9932CC" },
+  { inputs: ["galaxy", "galaxy", "galaxy"], output: "universe", name: "Universe", color: "#000080" },
+  { inputs: ["water", "carbon", "nitrogen"], output: "life", name: "Life", color: "#00FF00" },
+  { inputs: ["iron", "carbon"], output: "steel", name: "Steel", color: "#708090" },
+  { inputs: ["silicon", "gold"], output: "computer", name: "Computer", color: "#00FFFF" }
+];
+
+// ================== MATHEMATICS SYSTEMS ==================
+
+// Algebraic Geometry System
+const algebraicGeometryState = {
+  active: false,
+  discovered: ["point", "line", "circle"],
+  currentConstruction: [],
+  selectedTool: "point"
+};
+
+const geometricObjects = [
+  { id: "point", name: "Point", symbol: "•", color: "#FF6B6B", description: "Zero-dimensional object", tier: 1 },
+  { id: "line", name: "Line", symbol: "—", color: "#4ECDC4", description: "One-dimensional variety", tier: 1 },
+  { id: "circle", name: "Circle", symbol: "○", color: "#45B7D1", description: "Conic section x²+y²=r²", tier: 1 },
+  { id: "parabola", name: "Parabola", symbol: "∪", color: "#96CEB4", description: "Conic y=x²", tier: 2 },
+  { id: "ellipse", name: "Ellipse", symbol: "⬭", color: "#FFEAA7", description: "Conic x²/a²+y²/b²=1", tier: 2 },
+  { id: "hyperbola", name: "Hyperbola", symbol: ")(", color: "#DDA0DD", description: "Conic x²/a²-y²/b²=1", tier: 2 },
+  { id: "cubic", name: "Cubic Curve", symbol: "∿", color: "#FF7675", description: "Degree 3 polynomial", tier: 3 },
+  { id: "ellipticCurve", name: "Elliptic Curve", symbol: "ε", color: "#74B9FF", description: "y²=x³+ax+b", tier: 3 },
+  { id: "surface", name: "Algebraic Surface", symbol: "◇", color: "#A29BFE", description: "2D variety in 3-space", tier: 4 },
+  { id: "variety", name: "Projective Variety", symbol: "V", color: "#FD79A8", description: "Zero set of polynomials", tier: 4 },
+  { id: "scheme", name: "Scheme", symbol: "S", color: "#00CEC9", description: "Generalized variety", tier: 5 },
+  { id: "sheaf", name: "Sheaf", symbol: "F", color: "#E17055", description: "Local-global structure", tier: 5 }
+];
+
+const geometryTheorems = [
+  { inputs: ["point", "point"], output: "line", name: "Two Points Define Line", reward: 15 },
+  { inputs: ["line", "line"], output: "point", name: "Lines Intersect at Point", reward: 15 },
+  { inputs: ["circle", "line"], output: "parabola", name: "Conic Section Discovery", reward: 25 },
+  { inputs: ["parabola", "line"], output: "ellipse", name: "Ellipse from Parabola", reward: 30 },
+  { inputs: ["ellipse", "point"], output: "hyperbola", name: "Hyperbola Discovery", reward: 35 },
+  { inputs: ["circle", "circle", "circle"], output: "cubic", name: "Cubic Curve", reward: 50 },
+  { inputs: ["cubic", "point", "point"], output: "ellipticCurve", name: "Elliptic Curve", reward: 75 },
+  { inputs: ["ellipticCurve", "ellipticCurve"], output: "surface", name: "Algebraic Surface", reward: 100 },
+  { inputs: ["surface", "surface"], output: "variety", name: "Projective Variety", reward: 150 },
+  { inputs: ["variety", "sheaf"], output: "scheme", name: "Scheme Theory", reward: 250 }
+];
+
+// Topology System
+const topologyState = {
+  active: false,
+  discovered: ["point_top", "interval", "circle_top"],
+  spaces: []
+};
+
+const topologicalSpaces = [
+  { id: "point_top", name: "Point", symbol: "•", color: "#E74C3C", description: "Trivial topology", tier: 1, genus: 0 },
+  { id: "interval", name: "Interval [0,1]", symbol: "I", color: "#3498DB", description: "Connected space", tier: 1, genus: 0 },
+  { id: "circle_top", name: "Circle S¹", symbol: "S¹", color: "#2ECC71", description: "1-sphere, π₁=ℤ", tier: 1, genus: 1 },
+  { id: "sphere", name: "Sphere S²", symbol: "S²", color: "#9B59B6", description: "2-sphere, simply connected", tier: 2, genus: 0 },
+  { id: "torus", name: "Torus T²", symbol: "T²", color: "#F39C12", description: "Donut shape, genus 1", tier: 2, genus: 1 },
+  { id: "kleinBottle", name: "Klein Bottle", symbol: "K", color: "#1ABC9C", description: "Non-orientable surface", tier: 3, genus: 0 },
+  { id: "mobiusStrip", name: "Möbius Strip", symbol: "M", color: "#E91E63", description: "One-sided surface", tier: 3, genus: 0 },
+  { id: "projectivePlane", name: "RP²", symbol: "ℝP²", color: "#00BCD4", description: "Real projective plane", tier: 3, genus: 0 },
+  { id: "threeSphere", name: "3-Sphere S³", symbol: "S³", color: "#673AB7", description: "3-dimensional sphere", tier: 4, genus: 0 },
+  { id: "manifold", name: "n-Manifold", symbol: "M^n", color: "#FF5722", description: "Locally Euclidean space", tier: 4, genus: -1 },
+  { id: "cw_complex", name: "CW Complex", symbol: "CW", color: "#795548", description: "Cell decomposition", tier: 5, genus: -1 },
+  { id: "fiber_bundle", name: "Fiber Bundle", symbol: "E→B", color: "#607D8B", description: "Twisted product", tier: 5, genus: -1 }
+];
+
+const topologyOperations = [
+  { inputs: ["interval", "interval"], output: "sphere", name: "Suspension", reward: 20 },
+  { inputs: ["circle_top", "circle_top"], output: "torus", name: "Product Space T²=S¹×S¹", reward: 30 },
+  { inputs: ["interval", "mobiusStrip"], output: "kleinBottle", name: "Klein Bottle Construction", reward: 50 },
+  { inputs: ["circle_top", "interval"], output: "mobiusStrip", name: "Möbius Strip", reward: 40 },
+  { inputs: ["sphere", "point_top"], output: "projectivePlane", name: "Quotient RP²", reward: 45 },
+  { inputs: ["sphere", "sphere"], output: "threeSphere", name: "Join to S³", reward: 60 },
+  { inputs: ["torus", "torus"], output: "manifold", name: "Connected Sum", reward: 80 },
+  { inputs: ["manifold", "interval"], output: "cw_complex", name: "CW Structure", reward: 100 },
+  { inputs: ["cw_complex", "circle_top"], output: "fiber_bundle", name: "Fiber Bundle", reward: 150 }
+];
+
+// Advanced Functional Analysis System
+const functionalAnalysisState = {
+  active: false,
+  discovered: ["real_numbers", "sequence", "continuous_func"],
+  currentConstruction: []
+};
+
+const functionalSpaces = [
+  { id: "real_numbers", name: "ℝ", symbol: "ℝ", color: "#E74C3C", description: "Real number field", tier: 1 },
+  { id: "sequence", name: "Sequence Space", symbol: "ℓ", color: "#3498DB", description: "Space of sequences", tier: 1 },
+  { id: "continuous_func", name: "C[a,b]", symbol: "C", color: "#2ECC71", description: "Continuous functions", tier: 1 },
+  { id: "lp_space", name: "Lᵖ Space", symbol: "Lᵖ", color: "#9B59B6", description: "p-integrable functions", tier: 2 },
+  { id: "l2_space", name: "ℓ² Space", symbol: "ℓ²", color: "#F39C12", description: "Square-summable sequences", tier: 2 },
+  { id: "banach", name: "Banach Space", symbol: "B", color: "#1ABC9C", description: "Complete normed space", tier: 3 },
+  { id: "hilbert", name: "Hilbert Space", symbol: "H", color: "#E91E63", description: "Complete inner product", tier: 3 },
+  { id: "sobolev", name: "Sobolev Space", symbol: "W^{k,p}", color: "#00BCD4", description: "Weak derivatives in Lᵖ", tier: 4 },
+  { id: "dual_space", name: "Dual Space", symbol: "X*", color: "#673AB7", description: "Bounded linear functionals", tier: 4 },
+  { id: "operator_algebra", name: "B(H)", symbol: "B(H)", color: "#FF5722", description: "Bounded operators on H", tier: 5 },
+  { id: "c_star", name: "C*-Algebra", symbol: "A*", color: "#795548", description: "Involutive Banach algebra", tier: 5 },
+  { id: "von_neumann", name: "von Neumann Algebra", symbol: "M", color: "#607D8B", description: "W*-algebra", tier: 6 }
+];
+
+const analysisTheorems = [
+  { inputs: ["sequence", "sequence"], output: "l2_space", name: "ℓ² Construction", reward: 20 },
+  { inputs: ["continuous_func", "continuous_func"], output: "lp_space", name: "Lᵖ Space", reward: 25 },
+  { inputs: ["lp_space", "real_numbers"], output: "banach", name: "Banach Space Completion", reward: 40 },
+  { inputs: ["l2_space", "l2_space"], output: "hilbert", name: "Hilbert Space", reward: 50 },
+  { inputs: ["banach", "continuous_func"], output: "sobolev", name: "Sobolev Embedding", reward: 60 },
+  { inputs: ["banach", "banach"], output: "dual_space", name: "Hahn-Banach Theorem", reward: 75 },
+  { inputs: ["hilbert", "hilbert"], output: "operator_algebra", name: "Operator Theory", reward: 100 },
+  { inputs: ["operator_algebra", "dual_space"], output: "c_star", name: "C*-Algebra", reward: 150 },
+  { inputs: ["c_star", "c_star"], output: "von_neumann", name: "von Neumann Algebra", reward: 250 }
+];
+
+// UI state for math modules
+let showingAlgebraicGeometry = false;
+let showingTopology = false;
+let showingFunctionalAnalysis = false;
+
+// ================== Game Mode Functions ==================
+function switchGameMode(mode) {
+  gameMode = mode;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  
+  // Reset specific mode states
+  if (mode === "arena") {
+    arenaState.active = true;
+    arenaState.playerStocks = 3;
+    arenaState.cpuStocks = 3;
+    arenaState.playerDamage = 0;
+    arenaState.cpuDamage = 0;
+    arenaState.playerSpecialCharge = 0;
+    arenaState.cpuSpecialCharge = 0;
+    arenaState.weapons = [];
+    arenaState.items = [];
+    arenaState.projectiles = [];
+    arenaState.comboCount = 0;
+    arenaState.respawnTimer = 0;
+    arenaState.cpuRespawnTimer = 0;
+    arenaState.screenKO = null;
+    arenaState.announcer = "READY... FIGHT!";
+    setTimeout(() => arenaState.announcer = null, 2000);
+    spawnArenaWeapon();
+    spawnArenaItem();
+  } else {
+    arenaState.active = false;
+  }
+  
+  if (mode === "simulation") {
+    simState.active = true;
+    simState.entities = [];
+  } else {
+    simState.active = false;
+  }
+  
+  if (mode === "chemistry") {
+    chemistryState.active = true;
+    chemistryState.currentMix = [];
+    chemistryState.craftingResult = null;
+  } else {
+    chemistryState.active = false;
+  }
+}
+
+// ================== Gambling System Functions ==================
+function placeBet(amount) {
+  if (playerStats.coins >= amount) {
+    playerStats.currentBet = amount;
+    playerStats.coins -= amount;
+    return true;
+  }
+  return false;
+}
+
+function spinSlots() {
+  if (playerStats.slotSpinning) return;
+  if (!placeBet(10)) return;
+  
+  playerStats.slotSpinning = true;
+  const symbols = ["🍒", "🍋", "🍊", "💎", "7️⃣", "⭐"];
+  
+  setTimeout(() => {
+    playerStats.slotResults = [
+      Math.floor(Math.random() * symbols.length),
+      Math.floor(Math.random() * symbols.length),
+      Math.floor(Math.random() * symbols.length)
+    ];
+    
+    // Calculate winnings
+    const [a, b, c] = playerStats.slotResults;
+    let winnings = 0;
+    if (a === b && b === c) {
+      winnings = a === 4 ? 100 : (a === 3 ? 50 : 25); // 777 = 100, diamonds = 50, others = 25
+    } else if (a === b || b === c || a === c) {
+      winnings = 5;
+    }
+    
+    playerStats.coins += winnings;
+    playerStats.slotSpinning = false;
+    playerStats.currentBet = 0;
+  }, 1500);
+}
+
+function rollDice() {
+  if (!placeBet(5)) return 0;
+  const roll = Math.floor(Math.random() * 6) + 1 + Math.floor(Math.random() * 6) + 1;
+  playerStats.lastDiceRoll = roll;
+  
+  if (roll === 7 || roll === 11) {
+    playerStats.coins += 15;
+  } else if (roll === 2 || roll === 12) {
+    playerStats.coins += 25;
+  }
+  return roll;
+}
+
+function betOnMatch(amount) {
+  return placeBet(amount);
+}
+
+function collectMatchWinnings(won) {
+  if (won) {
+    playerStats.coins += playerStats.currentBet * 2;
+    playerStats.totalWins++;
+  } else {
+    playerStats.totalLosses++;
+  }
+  playerStats.currentBet = 0;
+}
+
+// ================== Power-Up Shop Functions ==================
+function buyPowerUp(itemId) {
+  const item = shopItems.find(i => i.id === itemId);
+  if (!item || playerStats.coins < item.cost || item.active) return false;
+  
+  playerStats.coins -= item.cost;
+  item.active = true;
+  item.timer = item.duration;
+  applyPowerUp(item);
+  return true;
+}
+
+function applyPowerUp(item) {
+  switch(item.id) {
+    case "speedBoost":
+      p1.speed = CONFIG.PLAYER_SPEED * 1.35;
+      break;
+    case "jumpBoost":
+      p1.jumpPower = CONFIG.PLAYER_JUMP_POWER * 1.25;
+      break;
+    case "slowCPU":
+      p2.speed = CONFIG.BOT_SPEED * 0.7;
+      break;
+  }
+}
+
+function removePowerUp(item) {
+  item.active = false;
+  switch(item.id) {
+    case "speedBoost":
+      p1.speed = CONFIG.PLAYER_SPEED;
+      break;
+    case "jumpBoost":
+      p1.jumpPower = CONFIG.PLAYER_JUMP_POWER;
+      break;
+    case "slowCPU":
+      p2.speed = CONFIG.BOT_SPEED;
+      break;
+  }
+}
+
+function updatePowerUps() {
+  for (const item of shopItems) {
+    if (item.active) {
+      item.timer--;
+      if (item.timer <= 0) {
+        removePowerUp(item);
+      }
+    }
+  }
+}
+
+// ================== Arena Battle Functions (Super Smash Bros Style) ==================
+function spawnArenaWeapon() {
+  if (arenaState.weapons.length < 3) {
+    const type = weaponTypes[Math.floor(Math.random() * weaponTypes.length)];
+    // Spawn on platforms or ground
+    const spawnLocations = [
+      { x: 250, y: 300 },
+      { x: 450, y: 200 },
+      { x: 650, y: 300 },
+      { x: 450, y: groundY - 20 }
+    ];
+    const loc = spawnLocations[Math.floor(Math.random() * spawnLocations.length)];
+    arenaState.weapons.push({
+      ...type,
+      x: loc.x + (Math.random() - 0.5) * 50,
+      y: loc.y,
+      spawned: frameCount,
+      floatOffset: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function spawnArenaItem() {
+  if (arenaState.items.length < 2 && Math.random() < 0.3) {
+    const item = smashItems[Math.floor(Math.random() * smashItems.length)];
+    arenaState.items.push({
+      ...item,
+      x: 150 + Math.random() * 600,
+      y: 100 + Math.random() * 200,
+      spawned: frameCount
+    });
+  }
+}
+
+function pickupWeapon(player, isPlayer = true) {
+  const px = player.x + player.w / 2;
+  const py = player.y + player.h / 2;
+  
+  // Check weapons
+  for (let i = arenaState.weapons.length - 1; i >= 0; i--) {
+    const weapon = arenaState.weapons[i];
+    const dist = Math.hypot(px - weapon.x, py - weapon.y);
+    if (dist < 50) {
+      if (isPlayer) {
+        arenaState.currentWeapon = weapon;
+      } else {
+        arenaState.cpuWeapon = weapon;
+      }
+      arenaState.weapons.splice(i, 1);
+      playSound("bump", { intensity: 0.5 });
+      return true;
+    }
+  }
+  
+  // Check items
+  for (let i = arenaState.items.length - 1; i >= 0; i--) {
+    const item = arenaState.items[i];
+    const dist = Math.hypot(px - item.x, py - item.y);
+    if (dist < 40) {
+      applySmashItem(item, isPlayer);
+      arenaState.items.splice(i, 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+function applySmashItem(item, isPlayer) {
+  switch(item.effect) {
+    case "heal":
+      if (isPlayer) {
+        arenaState.playerDamage = Math.max(0, arenaState.playerDamage - item.value);
+      } else {
+        arenaState.cpuDamage = Math.max(0, arenaState.cpuDamage - item.value);
+      }
+      spawnBurst(item.x, item.y, { color: "#FF69B4", count: 20 });
+      break;
+    case "invincible":
+      // Add temporary invincibility
+      if (isPlayer) {
+        arenaState.playerInvincible = item.duration;
+      } else {
+        arenaState.cpuInvincible = item.duration;
+      }
+      spawnBurst(item.x, item.y, { color: "#FFD700", count: 30 });
+      break;
+  }
+  playSound("spike", { intensity: 1 });
+}
+
+function arenaAttack(attacker, defender, weapon, isPlayer) {
+  if (!weapon) return false;
+  
+  const attackerX = attacker.x + attacker.w / 2;
+  const attackerY = attacker.y + attacker.h / 2;
+  const defenderX = defender.x + defender.w / 2;
+  const defenderY = defender.y + defender.h / 2;
+  const dist = Math.hypot(attackerX - defenderX, attackerY - defenderY);
+  
+  // Check invincibility
+  if (isPlayer && arenaState.cpuInvincible > 0) return false;
+  if (!isPlayer && arenaState.playerInvincible > 0) return false;
+  
+  if (dist <= weapon.range) {
+    const damage = weapon.damage;
+    // Smash Bros formula: knockback scales with damage percentage
+    const targetDamage = isPlayer ? arenaState.cpuDamage : arenaState.playerDamage;
+    const knockbackMultiplier = 1 + (targetDamage / 50);
+    const knockback = weapon.knockback * knockbackMultiplier;
+    
+    // Direction of knockback
+    const angle = Math.atan2(defenderY - attackerY, defenderX - attackerX);
+    const kbX = Math.cos(angle) * knockback;
+    const kbY = Math.sin(angle) * knockback - knockback * 0.3; // Upward bias like Smash
+    
+    if (isPlayer) {
+      arenaState.cpuDamage += damage;
+      defender.x += kbX;
+      defender.vy = Math.min(defender.vy + kbY, -5);
+      arenaState.comboCount++;
+      arenaState.lastHitTime = frameCount;
+      arenaState.playerSpecialCharge = Math.min(100, arenaState.playerSpecialCharge + damage);
+    } else {
+      arenaState.playerDamage += damage;
+      defender.x += kbX;
+      defender.vy = Math.min(defender.vy + kbY, -5);
+      arenaState.cpuSpecialCharge = Math.min(100, arenaState.cpuSpecialCharge + damage);
+    }
+    
+    // Hit effects
+    spawnBurst(defenderX, defenderY, { 
+      color: targetDamage > 100 ? "rgba(255,50,50,0.9)" : "rgba(255,200,100,0.9)", 
+      count: Math.min(30, 10 + targetDamage / 10),
+      speed: knockback * 0.3
+    });
+    
+    // Screen shake based on knockback
+    cameraShake = Math.min(15, knockback * 0.5);
+    
+    // Hit sound
+    playSound("spike", { intensity: Math.min(2, 0.5 + targetDamage / 100) });
+    
+    // Home run bat instant KO at high damage
+    if (weapon.homeRun && targetDamage > 80) {
+      arenaState.screenKO = isPlayer ? "cpu" : "player";
+      if (isPlayer) {
+        defender.x = 1200;
+      } else {
+        defender.x = -200;
+      }
+    }
+    
+    return true;
+  }
+  return false;
+}
+
+function performSpecialMove(player, direction, isPlayer) {
+  const move = specialMoves.player[direction];
+  const charge = isPlayer ? arenaState.playerSpecialCharge : arenaState.cpuSpecialCharge;
+  
+  if (charge < move.charge) return false;
+  
+  if (isPlayer) {
+    arenaState.playerSpecialCharge -= move.charge;
+  } else {
+    arenaState.cpuSpecialCharge -= move.charge;
+  }
+  
+  const px = player.x + player.w / 2;
+  const py = player.y + player.h / 2;
+  
+  switch(direction) {
+    case "neutral":
+      // Energy ball projectile
+      arenaState.projectiles.push({
+        x: px,
+        y: py,
+        vx: isPlayer ? 8 : -8,
+        vy: 0,
+        damage: move.damage,
+        knockback: move.knockback,
+        owner: isPlayer ? "player" : "cpu",
+        color: isPlayer ? "#00BFFF" : "#FF4500",
+        size: 15,
+        life: 120
+      });
+      break;
+    case "side":
+      // Dash attack
+      player.x += isPlayer ? 100 : -100;
+      player.vx = isPlayer ? 15 : -15;
+      arenaAttack(player, isPlayer ? p2 : p1, { damage: move.damage, knockback: move.knockback, range: 80 }, isPlayer);
+      break;
+    case "up":
+      // Recovery move
+      player.vy = -18;
+      spawnBurst(px, py, { color: "#FFD700", count: 15 });
+      break;
+    case "down":
+      // Ground pound
+      if (!player.isGrounded || player.isGrounded()) {
+        player.vy = 20;
+        arenaState.groundPound = { owner: isPlayer ? "player" : "cpu", active: true };
+      }
+      break;
+  }
+  
+  spawnBurst(px, py, { color: isPlayer ? "#00BFFF" : "#FF4500", count: 20 });
+  playSound("spike", { intensity: 1.5 });
+  return true;
+}
+
+function updateProjectiles() {
+  for (let i = arenaState.projectiles.length - 1; i >= 0; i--) {
+    const proj = arenaState.projectiles[i];
+    proj.x += proj.vx;
+    proj.y += proj.vy;
+    proj.life--;
+    
+    if (proj.life <= 0 || proj.x < -50 || proj.x > 950 || proj.y < -50 || proj.y > 550) {
+      arenaState.projectiles.splice(i, 1);
+      continue;
+    }
+    
+    // Check collision with players
+    const target = proj.owner === "player" ? p2 : p1;
+    const dist = Math.hypot(proj.x - (target.x + target.w/2), proj.y - (target.y + target.h/2));
+    if (dist < proj.size + 20) {
+      arenaAttack(
+        { x: proj.x - 20, y: proj.y - 20, w: 40, h: 40 },
+        target,
+        { damage: proj.damage, knockback: proj.knockback, range: 50 },
+        proj.owner === "player"
+      );
+      arenaState.projectiles.splice(i, 1);
+    }
+  }
+}
+
+function checkPlatformCollision(player) {
+  if (!arenaState.active) return false;
+  if (player.vy < 0) return false; // Only when falling
+  
+  for (const plat of arenaState.platforms) {
+    if (player.x + player.w > plat.x && player.x < plat.x + plat.w) {
+      if (player.y + player.h >= plat.y && player.y + player.h <= plat.y + plat.h + 10) {
+        player.y = plat.y - player.h;
+        player.vy = 0;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function checkBlastZone(player, isPlayer) {
+  // Blast zones (KO boundaries) like Smash Bros
+  if (player.x < -150 || player.x > 1050 || player.y < -150 || player.y > 600) {
+    if (isPlayer) {
+      arenaState.playerStocks--;
+      arenaState.playerDamage = 0;
+      arenaState.respawnTimer = 120;
+      arenaState.screenKO = "player";
+      if (arenaState.playerStocks > 0) {
+        arenaState.announcer = "Player Down!";
+        setTimeout(() => arenaState.announcer = null, 1500);
+      }
+    } else {
+      arenaState.cpuStocks--;
+      arenaState.cpuDamage = 0;
+      arenaState.cpuRespawnTimer = 120;
+      arenaState.screenKO = "cpu";
+      playerStats.coins += 20;
+      if (arenaState.cpuStocks > 0) {
+        arenaState.announcer = "CPU Down!";
+        setTimeout(() => arenaState.announcer = null, 1500);
+      }
+    }
+    
+    // Respawn position
+    if (isPlayer && arenaState.playerStocks > 0) {
+      player.x = 200;
+      player.y = 100;
+      player.vx = 0;
+      player.vy = 0;
+      arenaState.playerInvincible = 180;
+    } else if (!isPlayer && arenaState.cpuStocks > 0) {
+      player.x = 700;
+      player.y = 100;
+      player.vx = 0;
+      player.vy = 0;
+      arenaState.cpuInvincible = 180;
+    }
+    
+    return true;
+  }
+  return false;
+}
+
+function updateArena() {
+  if (!arenaState.active) return;
+  
+  // Spawn weapons and items periodically
+  if (frameCount % 180 === 0) spawnArenaWeapon();
+  if (frameCount % 300 === 0) spawnArenaItem();
+  
+  // Cooldowns and timers
+  if (arenaState.attackCooldown > 0) arenaState.attackCooldown--;
+  if (arenaState.cpuAttackCooldown > 0) arenaState.cpuAttackCooldown--;
+  if (arenaState.playerInvincible > 0) arenaState.playerInvincible--;
+  if (arenaState.cpuInvincible > 0) arenaState.cpuInvincible--;
+  if (arenaState.respawnTimer > 0) arenaState.respawnTimer--;
+  if (arenaState.cpuRespawnTimer > 0) arenaState.cpuRespawnTimer--;
+  
+  // Reset combo if too much time passed
+  if (frameCount - arenaState.lastHitTime > 60) {
+    arenaState.comboCount = 0;
+  }
+  
+  // Platform collisions
+  checkPlatformCollision(p1);
+  checkPlatformCollision(p2);
+  
+  // Update projectiles
+  updateProjectiles();
+  
+  // Player pickup
+  pickupWeapon(p1, true);
+  
+  // Smarter CPU AI
+  pickupWeapon(p2, false);
+  const cpuDist = Math.abs((p2.x + p2.w/2) - (p1.x + p1.w/2));
+  
+  // CPU tries to attack when in range
+  if (arenaState.cpuWeapon && arenaState.cpuAttackCooldown <= 0 && cpuDist < arenaState.cpuWeapon.range * 1.1) {
+    arenaAttack(p2, p1, arenaState.cpuWeapon, false);
+    arenaState.cpuAttackCooldown = arenaState.cpuWeapon.cooldown;
+  }
+  
+  // CPU uses special moves
+  if (arenaState.cpuSpecialCharge >= 30 && cpuDist < 150 && Math.random() < 0.02) {
+    performSpecialMove(p2, "neutral", false);
+  }
+  
+  // CPU recovery when off stage
+  if (p2.x < 50 || p2.x > 850 || p2.y > 450) {
+    if (arenaState.cpuSpecialCharge >= 30) {
+      performSpecialMove(p2, "up", false);
+    }
+  }
+  
+  // Check blast zones (KO)
+  checkBlastZone(p1, true);
+  checkBlastZone(p2, false);
+  
+  // Check for game end
+  if (arenaState.playerStocks <= 0) {
+    arenaState.announcer = "GAME! CPU Wins!";
+    setTimeout(() => {
+      switchGameMode("volleyball");
+    }, 3000);
+  }
+  if (arenaState.cpuStocks <= 0) {
+    arenaState.announcer = "GAME! Player Wins!";
+    playerStats.coins += 100;
+    setTimeout(() => {
+      switchGameMode("volleyball");
+    }, 3000);
+  }
+}
+
+// ================== Life Simulation Functions ==================
+function spawnEntity(type, x, y) {
+  if (simState.entities.length >= simState.maxEntities) return;
+  
+  const entityType = entityTypes.find(e => e.id === type);
+  if (!entityType) return;
+  
+  simState.entities.push({
+    ...entityType,
+    x: x || Math.random() * 800 + 50,
+    y: y || groundY,
+    vx: (Math.random() - 0.5) * 2,
+    vy: 0,
+    currentHealth: entityType.health,
+    age: 0,
+    target: null
+  });
+}
+
+function updateSimulation() {
+  if (!simState.active) return;
+  
+  // Regenerate divine energy
+  simState.divineEnergy = Math.min(simState.maxDivineEnergy, simState.divineEnergy + 0.05);
+  
+  // Update entities
+  for (let i = simState.entities.length - 1; i >= 0; i--) {
+    const entity = simState.entities[i];
+    entity.age++;
+    
+    // Movement
+    entity.x += entity.vx * entity.speed;
+    entity.vy += 0.3;
+    entity.y += entity.vy;
+    
+    // Ground collision
+    if (entity.y > groundY) {
+      entity.y = groundY;
+      entity.vy = 0;
+    }
+    
+    // Boundary wrap
+    if (entity.x < 0) entity.x = 900;
+    if (entity.x > 900) entity.x = 0;
+    
+    // Random direction change
+    if (Math.random() < 0.02) {
+      entity.vx = (Math.random() - 0.5) * 2;
+    }
+    
+    // Hostile behavior
+    if (entity.hostile && entity.damage) {
+      for (const other of simState.entities) {
+        if (other !== entity && !other.hostile) {
+          const dist = Math.hypot(entity.x - other.x, entity.y - other.y);
+          if (dist < 30) {
+            other.currentHealth -= entity.damage * 0.1;
+            if (other.currentHealth <= 0) {
+              simState.entities.splice(simState.entities.indexOf(other), 1);
+            }
+          }
+        }
+      }
+    }
+    
+    // Death from old age
+    if (entity.age > 3600) { // 1 minute at 60fps
+      simState.entities.splice(i, 1);
+    }
+  }
+}
+
+function useGodPower(power) {
+  const godPower = simState.godPowers[power];
+  if (!godPower || simState.divineEnergy < godPower.cost || godPower.cooldown > 0) return;
+  
+  simState.divineEnergy -= godPower.cost;
+  godPower.cooldown = 120;
+  
+  switch(power) {
+    case "lightning":
+      // Strike random entity
+      if (simState.entities.length > 0) {
+        const target = simState.entities[Math.floor(Math.random() * simState.entities.length)];
+        target.currentHealth -= 50;
+        spawnBurst(target.x, target.y, { color: "rgba(255,255,0,0.9)", count: 20 });
+        if (target.currentHealth <= 0) {
+          simState.entities.splice(simState.entities.indexOf(target), 1);
+        }
+      }
+      break;
+    case "blessing":
+      // Heal all friendly entities
+      for (const entity of simState.entities) {
+        if (!entity.hostile) {
+          entity.currentHealth = Math.min(entity.health, entity.currentHealth + 20);
+        }
+      }
+      break;
+    case "plague":
+      // Damage all hostile entities
+      for (const entity of simState.entities) {
+        if (entity.hostile) {
+          entity.currentHealth -= 30;
+          if (entity.currentHealth <= 0) {
+            simState.entities.splice(simState.entities.indexOf(entity), 1);
+          }
+        }
+      }
+      break;
+    case "earthquake":
+      // Damage everything
+      for (let i = simState.entities.length - 1; i >= 0; i--) {
+        simState.entities[i].currentHealth -= 15;
+        simState.entities[i].vy = -8;
+        if (simState.entities[i].currentHealth <= 0) {
+          simState.entities.splice(i, 1);
+        }
+      }
+      cameraShake = 20;
+      break;
+  }
+}
+
+// ================== Evil Caterpillar Functions ==================
+function updateCaterpillar() {
+  if (!caterpillar.active) return;
+  
+  // Hunger decreases over time
+  caterpillar.hunger = Math.max(0, caterpillar.hunger - 0.02);
+  
+  // Move towards opponent if fed enough
+  if (caterpillar.targetOpponent && caterpillar.segments >= 10) {
+    const targetX = p2.x + p2.w / 2;
+    const dx = targetX - caterpillar.x;
+    caterpillar.x += Math.sign(dx) * Math.min(2, Math.abs(dx) * 0.02);
+    
+    // Attack opponent if close
+    if (Math.abs(dx) < 50) {
+      if (frameCount % 30 === 0) {
+        // In arena mode, damage health; in volleyball, give player a point
+        if (arenaState.active) {
+          arenaState.cpuHealth -= caterpillar.attackDamage;
+        } else if (gameMode === "volleyball") {
+          // Give player a point as caterpillar "eats" opponent's ability
+          p1.score = Math.min(settings.targetScore, p1.score + 0.1);
+        }
+        spawnBurst(p2.x + p2.w/2, p2.y + p2.h/2, { color: "rgba(100,255,100,0.9)", count: 8 });
+      }
+    }
+  }
+  
+  // Shrink if starving
+  if (caterpillar.hunger <= 0 && frameCount % 300 === 0) {
+    caterpillar.segments = Math.max(3, caterpillar.segments - 1);
+  }
+}
+
+function feedCaterpillar(food = 1) {
+  if (!caterpillar.active) return;
+  
+  caterpillar.hunger = Math.min(caterpillar.maxHunger, caterpillar.hunger + 20 * food);
+  caterpillar.foodEaten += food;
+  caterpillar.lastFedFrame = frameCount;
+  
+  // Grow if fed enough
+  if (caterpillar.foodEaten >= caterpillar.growthThreshold) {
+    caterpillar.segments = Math.min(caterpillar.maxSegments, caterpillar.segments + 1);
+    caterpillar.foodEaten = 0;
+    caterpillar.attackDamage += 2;
+  }
+  
+  // Start targeting opponent once big enough
+  if (caterpillar.segments >= 10) {
+    caterpillar.targetOpponent = true;
+  }
+  
+  playerStats.coins += 5; // Reward for feeding
+}
+
+function drawCaterpillar() {
+  if (!caterpillar.active) return;
+  
+  ctx.save();
+  const segmentSize = 12 + caterpillar.segments * 0.5;
+  
+  // Draw segments
+  for (let i = 0; i < caterpillar.segments; i++) {
+    const x = caterpillar.x - i * segmentSize * 0.8;
+    const y = caterpillar.y + Math.sin(frameCount * 0.1 + i * 0.5) * 3;
+    
+    // Body segment
+    ctx.fillStyle = i === 0 ? "#4a1" : "#3a2";
+    ctx.beginPath();
+    ctx.arc(x, y, segmentSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Spots
+    ctx.fillStyle = "#2a1";
+    ctx.beginPath();
+    ctx.arc(x + 2, y - 2, segmentSize / 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Head with eyes
+  const headX = caterpillar.x;
+  const headY = caterpillar.y;
+  
+  // Evil eyes
+  ctx.fillStyle = "#ff0";
+  ctx.beginPath();
+  ctx.arc(headX + 4, headY - 4, 3, 0, Math.PI * 2);
+  ctx.arc(headX - 4, headY - 4, 3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = "#f00";
+  ctx.beginPath();
+  ctx.arc(headX + 4, headY - 4, 1.5, 0, Math.PI * 2);
+  ctx.arc(headX - 4, headY - 4, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Antennae
+  ctx.strokeStyle = "#3a2";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(headX - 3, headY - segmentSize/2);
+  ctx.lineTo(headX - 8, headY - segmentSize);
+  ctx.moveTo(headX + 3, headY - segmentSize/2);
+  ctx.lineTo(headX + 8, headY - segmentSize);
+  ctx.stroke();
+  
+  // Hunger bar
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(caterpillar.x - 20, caterpillar.y - 30, 40, 6);
+  ctx.fillStyle = caterpillar.hunger > 30 ? "#0f0" : "#f00";
+  ctx.fillRect(caterpillar.x - 20, caterpillar.y - 30, 40 * (caterpillar.hunger / caterpillar.maxHunger), 6);
+  
+  ctx.restore();
+}
+
+// ================== Chemistry System Functions ==================
+function addElementToMix(elementId) {
+  if (chemistryState.currentMix.length >= 4) return;
+  
+  const element = baseElements.find(e => e.id === elementId);
+  if (element && chemistryState.discovered.includes(elementId)) {
+    chemistryState.currentMix.push(elementId);
+  }
+}
+
+function clearMix() {
+  chemistryState.currentMix = [];
+  chemistryState.craftingResult = null;
+}
+
+function tryCraft() {
+  if (chemistryState.currentMix.length < 2) return null;
+  
+  // Sort for comparison
+  const sorted = [...chemistryState.currentMix].sort();
+  
+  for (const recipe of chemistryRecipes) {
+    const recipeSorted = [...recipe.inputs].sort();
+    if (sorted.length === recipeSorted.length && 
+        sorted.every((val, idx) => val === recipeSorted[idx])) {
+      // Found a match!
+      chemistryState.craftingResult = recipe;
+      
+      // Unlock the new element/compound
+      if (!chemistryState.discovered.includes(recipe.output)) {
+        chemistryState.discovered.push(recipe.output);
+        playerStats.coins += 25; // Discovery bonus
+        
+        // Special effects for major discoveries
+        if (recipe.output === "nuke") {
+          cameraShake = 50;
+          spawnBurst(450, 250, { color: "rgba(255,200,100,0.9)", count: 50, spread: 3, speed: 8 });
+        } else if (recipe.output === "universe") {
+          cameraShake = 30;
+          spawnBurst(450, 250, { color: "rgba(100,100,255,0.9)", count: 100, spread: 3.14, speed: 10 });
+          playerStats.coins += 500; // Massive bonus for creating the universe
+        } else if (recipe.output === "life") {
+          spawnBurst(450, 250, { color: "rgba(100,255,100,0.9)", count: 30, spread: 2, speed: 5 });
+          // Spawn entities in simulation
+          if (simState.active) {
+            for (let i = 0; i < 5; i++) spawnEntity("human");
+          }
+        }
+      }
+      
+      chemistryState.currentMix = [];
+      return recipe;
+    }
+  }
+  
+  // No match - failed combination
+  chemistryState.currentMix = [];
+  return null;
+}
+
+// ================== Algebraic Geometry Functions ==================
+function addGeometricObject(objectId) {
+  if (algebraicGeometryState.currentConstruction.length >= 4) return;
+  
+  const obj = geometricObjects.find(o => o.id === objectId);
+  if (obj && algebraicGeometryState.discovered.includes(objectId)) {
+    algebraicGeometryState.currentConstruction.push(objectId);
+  }
+}
+
+function clearGeometryConstruction() {
+  algebraicGeometryState.currentConstruction = [];
+}
+
+function tryGeometryTheorem() {
+  if (algebraicGeometryState.currentConstruction.length < 2) return null;
+  
+  const sorted = [...algebraicGeometryState.currentConstruction].sort();
+  
+  for (const theorem of geometryTheorems) {
+    const theoremSorted = [...theorem.inputs].sort();
+    if (sorted.length === theoremSorted.length && 
+        sorted.every((val, idx) => val === theoremSorted[idx])) {
+      
+      if (!algebraicGeometryState.discovered.includes(theorem.output)) {
+        algebraicGeometryState.discovered.push(theorem.output);
+        playerStats.coins += theorem.reward;
+        
+        // Special effects
+        const obj = geometricObjects.find(o => o.id === theorem.output);
+        if (obj) {
+          spawnBurst(450, 250, { color: obj.color, count: 25, spread: 2, speed: 6 });
+          if (obj.tier >= 4) {
+            cameraShake = 15;
+          }
+        }
+      }
+      
+      algebraicGeometryState.currentConstruction = [];
+      return theorem;
+    }
+  }
+  
+  algebraicGeometryState.currentConstruction = [];
+  return null;
+}
+
+// ================== Topology Functions ==================
+function addTopologicalSpace(spaceId) {
+  if (topologyState.spaces.length >= 3) return;
+  
+  const space = topologicalSpaces.find(s => s.id === spaceId);
+  if (space && topologyState.discovered.includes(spaceId)) {
+    topologyState.spaces.push(spaceId);
+  }
+}
+
+function clearTopologyConstruction() {
+  topologyState.spaces = [];
+}
+
+function tryTopologyOperation() {
+  if (topologyState.spaces.length < 2) return null;
+  
+  const sorted = [...topologyState.spaces].sort();
+  
+  for (const op of topologyOperations) {
+    const opSorted = [...op.inputs].sort();
+    if (sorted.length === opSorted.length && 
+        sorted.every((val, idx) => val === opSorted[idx])) {
+      
+      if (!topologyState.discovered.includes(op.output)) {
+        topologyState.discovered.push(op.output);
+        playerStats.coins += op.reward;
+        
+        const space = topologicalSpaces.find(s => s.id === op.output);
+        if (space) {
+          spawnBurst(450, 250, { color: space.color, count: 30, spread: 2.5, speed: 5 });
+          if (space.tier >= 4) {
+            cameraShake = 20;
+          }
+        }
+      }
+      
+      topologyState.spaces = [];
+      return op;
+    }
+  }
+  
+  topologyState.spaces = [];
+  return null;
+}
+
+// ================== Functional Analysis Functions ==================
+function addFunctionalSpace(spaceId) {
+  if (functionalAnalysisState.currentConstruction.length >= 3) return;
+  
+  const space = functionalSpaces.find(s => s.id === spaceId);
+  if (space && functionalAnalysisState.discovered.includes(spaceId)) {
+    functionalAnalysisState.currentConstruction.push(spaceId);
+  }
+}
+
+function clearAnalysisConstruction() {
+  functionalAnalysisState.currentConstruction = [];
+}
+
+function tryAnalysisTheorem() {
+  if (functionalAnalysisState.currentConstruction.length < 2) return null;
+  
+  const sorted = [...functionalAnalysisState.currentConstruction].sort();
+  
+  for (const theorem of analysisTheorems) {
+    const theoremSorted = [...theorem.inputs].sort();
+    if (sorted.length === theoremSorted.length && 
+        sorted.every((val, idx) => val === theoremSorted[idx])) {
+      
+      if (!functionalAnalysisState.discovered.includes(theorem.output)) {
+        functionalAnalysisState.discovered.push(theorem.output);
+        playerStats.coins += theorem.reward;
+        
+        const space = functionalSpaces.find(s => s.id === theorem.output);
+        if (space) {
+          spawnBurst(450, 250, { color: space.color, count: 35, spread: 2, speed: 7 });
+          if (space.tier >= 5) {
+            cameraShake = 25;
+            playerStats.coins += 50; // Bonus for advanced theorems
+          }
+        }
+      }
+      
+      functionalAnalysisState.currentConstruction = [];
+      return theorem;
+    }
+  }
+  
+  functionalAnalysisState.currentConstruction = [];
+  return null;
+}
+
+// ================== Extended Drawing Functions ==================
+function drawShop() {
+  if (!showingShop) return;
+  
+  ctx.save();
+  // Background overlay
+  ctx.fillStyle = "rgba(0,0,0,0.8)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Shop panel
+  ctx.fillStyle = "rgba(50,50,80,0.95)";
+  ctx.fillRect(150, 50, 600, 400);
+  ctx.strokeStyle = "#gold";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(150, 50, 600, 400);
+  
+  // Title
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 28px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("⚡ POWER-UP SHOP ⚡", 450, 90);
+  
+  // Coins display
+  ctx.fillStyle = "#FFF";
+  ctx.font = "18px Arial";
+  ctx.fillText(`💰 Coins: ${playerStats.coins}`, 450, 120);
+  
+  // Items
+  let y = 160;
+  for (let i = 0; i < shopItems.length; i++) {
+    const item = shopItems[i];
+    const canAfford = playerStats.coins >= item.cost && !item.active;
+    
+    ctx.fillStyle = canAfford ? "rgba(100,150,100,0.8)" : "rgba(80,80,80,0.8)";
+    if (item.active) ctx.fillStyle = "rgba(100,100,200,0.8)";
+    ctx.fillRect(170, y, 560, 50);
+    
+    ctx.fillStyle = "#FFF";
+    ctx.font = "16px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(`${i+1}. ${item.name}`, 180, y + 20);
+    ctx.fillText(item.description, 180, y + 40);
+    
+    ctx.textAlign = "right";
+    if (item.active) {
+      ctx.fillStyle = "#0F0";
+      ctx.fillText(`ACTIVE (${Math.ceil(item.timer/60)}s)`, 720, y + 30);
+    } else {
+      ctx.fillStyle = canAfford ? "#FFD700" : "#888";
+      ctx.fillText(`${item.cost} coins`, 720, y + 30);
+    }
+    
+    y += 55;
+  }
+  
+  ctx.fillStyle = "#AAA";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Press 1-6 to buy | Press B to close shop", 450, 440);
+  
+  ctx.restore();
+}
+
+function drawGambling() {
+  if (!showingGambling) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Casino panel
+  ctx.fillStyle = "rgba(80,20,20,0.95)";
+  ctx.fillRect(150, 50, 600, 400);
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(150, 50, 600, 400);
+  
+  // Title
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 32px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🎰 CASINO 🎰", 450, 95);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "20px Arial";
+  ctx.fillText(`💰 Coins: ${playerStats.coins}`, 450, 130);
+  
+  // Slot machine
+  ctx.fillStyle = "rgba(40,40,60,0.9)";
+  ctx.fillRect(250, 150, 400, 100);
+  
+  const symbols = ["🍒", "🍋", "🍊", "💎", "7️⃣", "⭐"];
+  ctx.font = "48px Arial";
+  for (let i = 0; i < 3; i++) {
+    const symbol = playerStats.slotSpinning ? 
+      symbols[Math.floor(Math.random() * symbols.length)] : 
+      symbols[playerStats.slotResults[i]];
+    ctx.fillText(symbol, 320 + i * 120, 215);
+  }
+  
+  // Instructions
+  ctx.fillStyle = "#FFF";
+  ctx.font = "16px Arial";
+  ctx.fillText("Press S to Spin Slots (10 coins)", 450, 280);
+  ctx.fillText("Press D to Roll Dice (5 coins)", 450, 305);
+  ctx.fillText("Press V to Bet on Next Match (20 coins)", 450, 330);
+  
+  if (playerStats.lastDiceRoll > 0) {
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText(`Last Dice Roll: ${playerStats.lastDiceRoll}`, 450, 360);
+  }
+  
+  if (playerStats.currentBet > 0) {
+    ctx.fillStyle = "#0F0";
+    ctx.fillText(`Current Match Bet: ${playerStats.currentBet} coins`, 450, 385);
+  }
+  
+  ctx.fillStyle = "#AAA";
+  ctx.font = "14px Arial";
+  ctx.fillText("Press G to close casino", 450, 430);
+  
+  ctx.restore();
+}
+
+function drawChemistry() {
+  if (!showingChemistry) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Chemistry lab panel
+  ctx.fillStyle = "rgba(20,40,60,0.95)";
+  ctx.fillRect(100, 30, 700, 440);
+  ctx.strokeStyle = "#00FFFF";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(100, 30, 700, 440);
+  
+  // Title
+  ctx.fillStyle = "#00FFFF";
+  ctx.font = "bold 28px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("⚗️ CHEMISTRY LAB ⚗️", 450, 65);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.fillText(`Discovered: ${chemistryState.discovered.length}/${baseElements.length + chemistryRecipes.length}`, 450, 90);
+  
+  // Elements grid
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.fillText("Elements (Press number to add):", 250, 115);
+  
+  let x = 120, y = 130;
+  for (let i = 0; i < baseElements.length; i++) {
+    const elem = baseElements[i];
+    const unlocked = chemistryState.discovered.includes(elem.id);
+    
+    ctx.fillStyle = unlocked ? elem.color : "#333";
+    ctx.fillRect(x, y, 60, 60);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 60, 60);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(elem.symbol, x + 30, y + 30);
+    ctx.font = "10px Arial";
+    ctx.fillText(`[${i + 1}]`, x + 30, y + 50);
+    
+    x += 70;
+    if (x > 750) { x = 120; y += 70; }
+  }
+  
+  // Mixing area
+  ctx.fillStyle = "rgba(60,60,80,0.8)";
+  ctx.fillRect(120, 280, 300, 80);
+  ctx.strokeStyle = "#88F";
+  ctx.strokeRect(120, 280, 300, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Mixing:", 130, 300);
+  
+  // Show current mix
+  let mixX = 130;
+  for (const elemId of chemistryState.currentMix) {
+    const elem = baseElements.find(e => e.id === elemId);
+    if (elem) {
+      ctx.fillStyle = elem.color;
+      ctx.beginPath();
+      ctx.arc(mixX + 15, 335, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(elem.symbol, mixX + 15, 340);
+      mixX += 40;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 280, 330, 80);
+  ctx.strokeStyle = "#8F8";
+  ctx.strokeRect(450, 280, 330, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Result:", 460, 300);
+  
+  if (chemistryState.craftingResult) {
+    ctx.fillStyle = chemistryState.craftingResult.color;
+    ctx.font = "bold 18px Arial";
+    ctx.fillText(chemistryState.craftingResult.name, 460, 335);
+    ctx.fillStyle = "#0F0";
+    ctx.font = "12px Arial";
+    ctx.fillText("SUCCESS! +25 coins", 460, 355);
+  }
+  
+  // Discovered compounds
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Discovered compounds:", 450, 385);
+  
+  let compX = 150;
+  for (const recipe of chemistryRecipes) {
+    if (chemistryState.discovered.includes(recipe.output)) {
+      ctx.fillStyle = recipe.color;
+      ctx.font = "10px Arial";
+      ctx.fillText(recipe.name, compX, 410);
+      compX += 80;
+      if (compX > 750) break;
+    }
+  }
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Craft | Backspace to Clear | C to close lab", 450, 455);
+  
+  ctx.restore();
+}
+
+// ================== Algebraic Geometry Drawing ==================
+function drawAlgebraicGeometry() {
+  if (!showingAlgebraicGeometry) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Panel
+  ctx.fillStyle = "rgba(40,20,60,0.95)";
+  ctx.fillRect(50, 20, 800, 460);
+  ctx.strokeStyle = "#9C27B0";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 20, 800, 460);
+  
+  // Title
+  ctx.fillStyle = "#E1BEE7";
+  ctx.font = "bold 26px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("📐 ALGEBRAIC GEOMETRY LAB 📐", 450, 55);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.fillText(`Discovered: ${algebraicGeometryState.discovered.length}/${geometricObjects.length}`, 450, 80);
+  
+  // Objects grid
+  ctx.fillStyle = "#CCC";
+  ctx.font = "11px Arial";
+  ctx.fillText("Geometric Objects (Click or press 1-9,0 to add):", 300, 100);
+  
+  let x = 70, y = 115;
+  for (let i = 0; i < geometricObjects.length; i++) {
+    const obj = geometricObjects[i];
+    const unlocked = algebraicGeometryState.discovered.includes(obj.id);
+    
+    ctx.fillStyle = unlocked ? obj.color : "#333";
+    ctx.fillRect(x, y, 62, 55);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 62, 55);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 18px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(obj.symbol, x + 31, y + 25);
+    ctx.font = "8px Arial";
+    ctx.fillText(obj.name.substring(0, 10), x + 31, y + 40);
+    ctx.font = "9px Arial";
+    ctx.fillText(`[${(i + 1) % 10}]`, x + 31, y + 50);
+    
+    x += 68;
+    if (x > 800) { x = 70; y += 60; }
+  }
+  
+  // Construction area
+  ctx.fillStyle = "rgba(80,40,100,0.8)";
+  ctx.fillRect(70, 290, 350, 80);
+  ctx.strokeStyle = "#CE93D8";
+  ctx.strokeRect(70, 290, 350, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Construction:", 80, 310);
+  
+  let consX = 85;
+  for (const objId of algebraicGeometryState.currentConstruction) {
+    const obj = geometricObjects.find(o => o.id === objId);
+    if (obj) {
+      ctx.fillStyle = obj.color;
+      ctx.beginPath();
+      ctx.arc(consX + 18, 345, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(obj.symbol, consX + 18, 350);
+      consX += 45;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 290, 380, 80);
+  ctx.strokeStyle = "#A5D6A7";
+  ctx.strokeRect(450, 290, 380, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Theorem Result:", 460, 310);
+  
+  // Theorems list
+  ctx.fillStyle = "#AAA";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Available Theorems:", 450, 395);
+  
+  let thX = 100;
+  for (const theorem of geometryTheorems) {
+    const canMake = theorem.inputs.every(i => algebraicGeometryState.discovered.includes(i));
+    const made = algebraicGeometryState.discovered.includes(theorem.output);
+    ctx.fillStyle = made ? "#4CAF50" : (canMake ? "#FFF" : "#555");
+    ctx.font = "9px Arial";
+    ctx.fillText(theorem.name.substring(0, 15), thX, 415);
+    thX += 90;
+    if (thX > 800) break;
+  }
+  
+  // Visualization area - draw a simple geometric visualization
+  ctx.fillStyle = "rgba(20,10,30,0.9)";
+  ctx.fillRect(600, 115, 230, 160);
+  ctx.strokeStyle = "#7B1FA2";
+  ctx.strokeRect(600, 115, 230, 160);
+  
+  ctx.fillStyle = "#CE93D8";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Visualization", 715, 130);
+  
+  // Draw animated geometric shapes
+  const t = Date.now() / 1000;
+  ctx.strokeStyle = "#E1BEE7";
+  ctx.lineWidth = 2;
+  
+  // Animated ellipse
+  ctx.beginPath();
+  ctx.ellipse(715, 195, 50 + Math.sin(t) * 10, 30 + Math.cos(t) * 5, t * 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Parametric curve
+  ctx.strokeStyle = "#F48FB1";
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const angle = (i / 100) * Math.PI * 2;
+    const r = 40 + 15 * Math.sin(3 * angle + t);
+    const px = 715 + r * Math.cos(angle);
+    const py = 195 + r * Math.sin(angle);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Apply Theorem | Backspace to Clear | Click button to close", 450, 465);
+  
+  ctx.restore();
+}
+
+// ================== Topology Drawing ==================
+function drawTopology() {
+  if (!showingTopology) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Panel
+  ctx.fillStyle = "rgba(50,20,40,0.95)";
+  ctx.fillRect(50, 20, 800, 460);
+  ctx.strokeStyle = "#E91E63";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 20, 800, 460);
+  
+  // Title
+  ctx.fillStyle = "#F8BBD9";
+  ctx.font = "bold 26px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🔮 TOPOLOGY LAB 🔮", 450, 55);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.fillText(`Discovered: ${topologyState.discovered.length}/${topologicalSpaces.length}`, 450, 80);
+  
+  // Spaces grid
+  ctx.fillStyle = "#CCC";
+  ctx.font = "11px Arial";
+  ctx.fillText("Topological Spaces (Click or press 1-9,0 to add):", 300, 100);
+  
+  let x = 70, y = 115;
+  for (let i = 0; i < topologicalSpaces.length; i++) {
+    const space = topologicalSpaces[i];
+    const unlocked = topologyState.discovered.includes(space.id);
+    
+    ctx.fillStyle = unlocked ? space.color : "#333";
+    ctx.fillRect(x, y, 62, 55);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 62, 55);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 16px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(space.symbol, x + 31, y + 25);
+    ctx.font = "8px Arial";
+    ctx.fillText(space.name.substring(0, 10), x + 31, y + 40);
+    ctx.font = "9px Arial";
+    ctx.fillText(`[${(i + 1) % 10}]`, x + 31, y + 50);
+    
+    x += 68;
+    if (x > 800) { x = 70; y += 60; }
+  }
+  
+  // Construction area
+  ctx.fillStyle = "rgba(80,30,50,0.8)";
+  ctx.fillRect(70, 290, 350, 80);
+  ctx.strokeStyle = "#F48FB1";
+  ctx.strokeRect(70, 290, 350, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Space Construction:", 80, 310);
+  
+  let spX = 85;
+  for (const spaceId of topologyState.spaces) {
+    const space = topologicalSpaces.find(s => s.id === spaceId);
+    if (space) {
+      ctx.fillStyle = space.color;
+      ctx.beginPath();
+      ctx.arc(spX + 18, 345, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(space.symbol, spX + 18, 350);
+      spX += 45;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 290, 380, 80);
+  ctx.strokeStyle = "#A5D6A7";
+  ctx.strokeRect(450, 290, 380, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Operation Result:", 460, 310);
+  
+  // Operations list
+  ctx.fillStyle = "#AAA";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Available Operations:", 450, 395);
+  
+  let opX = 100;
+  for (const op of topologyOperations) {
+    const canMake = op.inputs.every(i => topologyState.discovered.includes(i));
+    const made = topologyState.discovered.includes(op.output);
+    ctx.fillStyle = made ? "#4CAF50" : (canMake ? "#FFF" : "#555");
+    ctx.font = "9px Arial";
+    ctx.fillText(op.name.substring(0, 18), opX, 415);
+    opX += 95;
+    if (opX > 800) break;
+  }
+  
+  // Visualization area - topological shapes
+  ctx.fillStyle = "rgba(30,10,20,0.9)";
+  ctx.fillRect(600, 115, 230, 160);
+  ctx.strokeStyle = "#C2185B";
+  ctx.strokeRect(600, 115, 230, 160);
+  
+  ctx.fillStyle = "#F8BBD9";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Topological Space", 715, 130);
+  
+  // Draw animated torus
+  const t = Date.now() / 1000;
+  ctx.strokeStyle = "#E91E63";
+  ctx.lineWidth = 1.5;
+  
+  // Torus cross-section animation
+  for (let j = 0; j < 8; j++) {
+    ctx.beginPath();
+    const phase = (j / 8) * Math.PI * 2 + t;
+    for (let i = 0; i <= 50; i++) {
+      const angle = (i / 50) * Math.PI * 2;
+      const r = 25 + 12 * Math.cos(phase);
+      const px = 715 + r * Math.cos(angle);
+      const py = 195 + r * Math.sin(angle) * 0.4 + 15 * Math.sin(phase);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(phase);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  
+  // Möbius strip hint
+  ctx.strokeStyle = "#F48FB1";
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const u = (i / 100) * Math.PI * 2;
+    const v = Math.sin(t + u * 2) * 0.5;
+    const px = 715 + (35 + 10 * v * Math.cos(u / 2)) * Math.cos(u);
+    const py = 230 + (35 + 10 * v * Math.cos(u / 2)) * Math.sin(u) * 0.3;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Apply Operation | Backspace to Clear | Click button to close", 450, 465);
+  
+  ctx.restore();
+}
+
+// ================== Functional Analysis Drawing ==================
+function drawFunctionalAnalysis() {
+  if (!showingFunctionalAnalysis) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Panel
+  ctx.fillStyle = "rgba(20,30,60,0.95)";
+  ctx.fillRect(50, 20, 800, 460);
+  ctx.strokeStyle = "#3F51B5";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 20, 800, 460);
+  
+  // Title
+  ctx.fillStyle = "#C5CAE9";
+  ctx.font = "bold 24px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("∫ ADVANCED FUNCTIONAL ANALYSIS ∫", 450, 55);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.fillText(`Discovered: ${functionalAnalysisState.discovered.length}/${functionalSpaces.length}`, 450, 80);
+  
+  // Spaces grid
+  ctx.fillStyle = "#CCC";
+  ctx.font = "11px Arial";
+  ctx.fillText("Function Spaces (Click or press 1-9,0 to add):", 300, 100);
+  
+  let x = 70, y = 115;
+  for (let i = 0; i < functionalSpaces.length; i++) {
+    const space = functionalSpaces[i];
+    const unlocked = functionalAnalysisState.discovered.includes(space.id);
+    
+    ctx.fillStyle = unlocked ? space.color : "#333";
+    ctx.fillRect(x, y, 62, 55);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 62, 55);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 14px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(space.symbol, x + 31, y + 25);
+    ctx.font = "8px Arial";
+    ctx.fillText(space.name.substring(0, 10), x + 31, y + 40);
+    ctx.font = "9px Arial";
+    ctx.fillText(`[${(i + 1) % 10}]`, x + 31, y + 50);
+    
+    x += 68;
+    if (x > 800) { x = 70; y += 60; }
+  }
+  
+  // Construction area
+  ctx.fillStyle = "rgba(40,50,100,0.8)";
+  ctx.fillRect(70, 290, 350, 80);
+  ctx.strokeStyle = "#7986CB";
+  ctx.strokeRect(70, 290, 350, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Space Construction:", 80, 310);
+  
+  let faX = 85;
+  for (const spaceId of functionalAnalysisState.currentConstruction) {
+    const space = functionalSpaces.find(s => s.id === spaceId);
+    if (space) {
+      ctx.fillStyle = space.color;
+      ctx.beginPath();
+      ctx.arc(faX + 18, 345, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 12px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(space.symbol, faX + 18, 350);
+      faX += 45;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 290, 380, 80);
+  ctx.strokeStyle = "#A5D6A7";
+  ctx.strokeRect(450, 290, 380, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Theorem Result:", 460, 310);
+  
+  // Theorems list
+  ctx.fillStyle = "#AAA";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Available Theorems:", 450, 395);
+  
+  let thX = 100;
+  for (const theorem of analysisTheorems) {
+    const canMake = theorem.inputs.every(i => functionalAnalysisState.discovered.includes(i));
+    const made = functionalAnalysisState.discovered.includes(theorem.output);
+    ctx.fillStyle = made ? "#4CAF50" : (canMake ? "#FFF" : "#555");
+    ctx.font = "9px Arial";
+    ctx.fillText(theorem.name.substring(0, 18), thX, 415);
+    thX += 95;
+    if (thX > 800) break;
+  }
+  
+  // Visualization area - function space
+  ctx.fillStyle = "rgba(15,20,40,0.9)";
+  ctx.fillRect(600, 115, 230, 160);
+  ctx.strokeStyle = "#303F9F";
+  ctx.strokeRect(600, 115, 230, 160);
+  
+  ctx.fillStyle = "#C5CAE9";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Function Space", 715, 130);
+  
+  // Draw animated function visualization
+  const t = Date.now() / 1000;
+  
+  // Draw coordinate axes
+  ctx.strokeStyle = "#5C6BC0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(620, 195);
+  ctx.lineTo(810, 195);
+  ctx.moveTo(715, 140);
+  ctx.lineTo(715, 260);
+  ctx.stroke();
+  
+  // Animated Fourier-like series
+  ctx.strokeStyle = "#7986CB";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i <= 180; i++) {
+    const x = 620 + i;
+    const u = (i - 90) / 30;
+    let y = 0;
+    for (let n = 1; n <= 5; n++) {
+      y += Math.sin(n * u + t * n * 0.3) / n;
+    }
+    y = 195 - y * 25;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  
+  // Draw basis functions hint
+  ctx.strokeStyle = "#9FA8DA";
+  ctx.globalAlpha = 0.5;
+  for (let n = 1; n <= 3; n++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 180; i++) {
+      const x = 620 + i;
+      const u = (i - 90) / 30;
+      const y = 195 - Math.sin(n * u + t) * 15 / n;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  
+  // Norm indicator
+  ctx.fillStyle = "#3F51B5";
+  ctx.font = "10px Arial";
+  ctx.fillText("||f||₂ = " + (2 + Math.sin(t)).toFixed(2), 715, 265);
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Apply Theorem | Backspace to Clear | Click button to close", 450, 465);
+  
+  ctx.restore();
+}
+
+function drawSimulation() {
+  if (!simState.active) return;
+  
+  // Draw entities
+  for (const entity of simState.entities) {
+    ctx.save();
+    ctx.fillStyle = entity.color;
+    ctx.beginPath();
+    ctx.arc(entity.x, entity.y - 10, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Health bar
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(entity.x - 10, entity.y - 25, 20, 4);
+    ctx.fillStyle = entity.currentHealth > entity.health * 0.3 ? "#0F0" : "#F00";
+    ctx.fillRect(entity.x - 10, entity.y - 25, 20 * (entity.currentHealth / entity.health), 4);
+    
+    ctx.restore();
+  }
+  
+  // Draw UI
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(5, 80, 150, 120);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText(`Entities: ${simState.entities.length}/${simState.maxEntities}`, 10, 95);
+  ctx.fillText(`Divine Energy: ${Math.floor(simState.divineEnergy)}`, 10, 115);
+  
+  ctx.fillStyle = "#AAA";
+  ctx.font = "10px Arial";
+  ctx.fillText("Z-Spawn | X-Lightning", 10, 135);
+  ctx.fillText("N-Blessing | M-Plague", 10, 150);
+  ctx.fillText(",-Earthquake", 10, 165);
+  ctx.fillText("I-Toggle Simulation", 10, 180);
+  
+  ctx.restore();
+}
+
+function drawArenaUI() {
+  if (!arenaState.active) return;
+  
+  ctx.save();
+  
+  // Draw platforms (Smash Bros style)
+  ctx.fillStyle = "rgba(100, 80, 60, 0.9)";
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 3;
+  for (const plat of arenaState.platforms) {
+    ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+    ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+  }
+  
+  // Draw blast zone indicators (red borders)
+  ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+  ctx.lineWidth = 5;
+  ctx.setLineDash([10, 10]);
+  ctx.strokeRect(-140, -140, 1180, 730);
+  ctx.setLineDash([]);
+  
+  // Player damage display (Smash Bros style - big percentage)
+  // Player 1
+  ctx.fillStyle = "rgba(0, 100, 200, 0.8)";
+  ctx.fillRect(50, 430, 180, 60);
+  ctx.strokeStyle = "#00BFFF";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 430, 180, 60);
+  
+  // Damage color changes based on percentage (green -> yellow -> orange -> red)
+  const p1DmgColor = arenaState.playerDamage < 50 ? "#00FF00" : 
+                     arenaState.playerDamage < 100 ? "#FFFF00" : 
+                     arenaState.playerDamage < 150 ? "#FFA500" : "#FF0000";
+  ctx.fillStyle = p1DmgColor;
+  ctx.font = "bold 36px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(`${Math.floor(arenaState.playerDamage)}%`, 140, 475);
+  
+  // Player 1 stocks
+  ctx.fillStyle = "#00BFFF";
+  for (let i = 0; i < arenaState.playerStocks; i++) {
+    ctx.beginPath();
+    ctx.arc(70 + i * 25, 445, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#FFF";
+  ctx.font = "12px Arial";
+  ctx.fillText("P1", 140, 425);
+  
+  // CPU
+  ctx.fillStyle = "rgba(200, 50, 50, 0.8)";
+  ctx.fillRect(670, 430, 180, 60);
+  ctx.strokeStyle = "#FF4500";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(670, 430, 180, 60);
+  
+  const cpuDmgColor = arenaState.cpuDamage < 50 ? "#00FF00" : 
+                      arenaState.cpuDamage < 100 ? "#FFFF00" : 
+                      arenaState.cpuDamage < 150 ? "#FFA500" : "#FF0000";
+  ctx.fillStyle = cpuDmgColor;
+  ctx.font = "bold 36px Arial";
+  ctx.fillText(`${Math.floor(arenaState.cpuDamage)}%`, 760, 475);
+  
+  // CPU stocks
+  ctx.fillStyle = "#FF4500";
+  for (let i = 0; i < arenaState.cpuStocks; i++) {
+    ctx.beginPath();
+    ctx.arc(690 + i * 25, 445, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#FFF";
+  ctx.font = "12px Arial";
+  ctx.fillText("CPU", 760, 425);
+  
+  // Special charge bars
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(50, 492, 180, 8);
+  ctx.fillRect(670, 492, 180, 8);
+  
+  ctx.fillStyle = "#FFD700";
+  ctx.fillRect(50, 492, 180 * (arenaState.playerSpecialCharge / 100), 8);
+  ctx.fillRect(670, 492, 180 * (arenaState.cpuSpecialCharge / 100), 8);
+  
+  // Weapons floating on ground with animation
+  for (const weapon of arenaState.weapons) {
+    const floatY = Math.sin((frameCount + weapon.floatOffset) * 0.1) * 5;
+    ctx.fillStyle = weapon.color;
+    ctx.strokeStyle = "#FFF";
+    ctx.lineWidth = 2;
+    
+    // Draw weapon icon based on type
+    ctx.beginPath();
+    ctx.arc(weapon.x, weapon.y + floatY, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = "#FFF";
+    ctx.font = "bold 10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(weapon.name.charAt(0), weapon.x, weapon.y + floatY + 4);
+    ctx.font = "9px Arial";
+    ctx.fillText(weapon.name, weapon.x, weapon.y + floatY - 20);
+  }
+  
+  // Items
+  for (const item of arenaState.items) {
+    const floatY = Math.sin(frameCount * 0.1) * 3;
+    ctx.fillStyle = item.color;
+    ctx.beginPath();
+    ctx.arc(item.x, item.y + floatY, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#FFF";
+    ctx.stroke();
+  }
+  
+  // Projectiles
+  for (const proj of arenaState.projectiles) {
+    ctx.fillStyle = proj.color;
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, proj.size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Trail effect
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(proj.x - proj.vx * 2, proj.y - proj.vy * 2, proj.size * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  
+  // Current weapon display
+  if (arenaState.currentWeapon) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(20, 90, 200, 50);
+    ctx.fillStyle = arenaState.currentWeapon.color;
+    ctx.font = "bold 14px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(`⚔️ ${arenaState.currentWeapon.name}`, 30, 110);
+    ctx.fillStyle = "#AAA";
+    ctx.font = "11px Arial";
+    ctx.fillText("Space: Attack | Z/X/C/V: Specials", 30, 130);
+  } else {
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(20, 90, 200, 30);
+    ctx.fillStyle = "#AAA";
+    ctx.font = "11px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText("Pick up a weapon! (walk over)", 30, 110);
+  }
+  
+  // Combo counter
+  if (arenaState.comboCount > 1) {
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 24px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(`${arenaState.comboCount} HIT COMBO!`, 450, 200);
+  }
+  
+  // Announcer text (READY FIGHT, KO, etc)
+  if (arenaState.announcer) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(200, 200, 500, 80);
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 40px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(arenaState.announcer, 450, 255);
+  }
+  
+  // Invincibility indicator
+  if (arenaState.playerInvincible > 0) {
+    ctx.strokeStyle = `rgba(255, 255, 0, ${0.5 + Math.sin(frameCount * 0.3) * 0.5})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(p1.x - 5, p1.y - 5, p1.w + 10, p1.h + 10);
+  }
+  if (arenaState.cpuInvincible > 0) {
+    ctx.strokeStyle = `rgba(255, 255, 0, ${0.5 + Math.sin(frameCount * 0.3) * 0.5})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(p2.x - 5, p2.y - 5, p2.w + 10, p2.h + 10);
+  }
+  
+  ctx.restore();
+}
+
+function drawModeSelector() {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(300, 5, 300, 20);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(`Mode: ${gameMode.toUpperCase()} | T-Toggle | B-Shop | G-Casino | C-Chem | K-Caterpillar`, 450, 18);
+  ctx.restore();
+}
 
 const maps = [
   {
@@ -287,6 +2622,165 @@ document.addEventListener("keydown", e => {
     keys["shift"] = true; // tracked but unused
     return;
   }
+  
+  // Extended game controls (when not paused)
+  if (!paused) {
+    // Toggle Shop
+    if (key === "b") {
+      showingShop = !showingShop;
+      showingGambling = false;
+      showingChemistry = false;
+      return;
+    }
+    
+    // Toggle Gambling/Casino
+    if (key === "g" && !showingShop && !showingChemistry) {
+      showingGambling = !showingGambling;
+      return;
+    }
+    
+    // Toggle Chemistry Lab
+    if (key === "c" && !showingShop && !showingGambling) {
+      showingChemistry = !showingChemistry;
+      return;
+    }
+    
+    // Toggle Caterpillar
+    if (key === "k") {
+      caterpillar.active = !caterpillar.active;
+      if (caterpillar.active) {
+        caterpillar.x = 100;
+        caterpillar.hunger = 50;
+      }
+      return;
+    }
+    
+    // Feed Caterpillar
+    if (key === "l" && caterpillar.active) {
+      feedCaterpillar();
+      return;
+    }
+    
+    // Toggle game modes
+    if (key === "t") {
+      const modes = ["volleyball", "arena", "simulation"];
+      const idx = modes.indexOf(gameMode);
+      switchGameMode(modes[(idx + 1) % modes.length]);
+      return;
+    }
+    
+    // Shop purchases (1-6)
+    if (showingShop) {
+      const num = parseInt(key);
+      if (num >= 1 && num <= 6) {
+        buyPowerUp(shopItems[num - 1].id);
+        return;
+      }
+    }
+    
+    // Gambling controls
+    if (showingGambling) {
+      if (key === "s") { spinSlots(); return; }
+      if (key === "d") { rollDice(); return; }
+      if (key === "v") { betOnMatch(20); return; }
+    }
+    
+    // Chemistry controls
+    if (showingChemistry) {
+      const num = parseInt(key);
+      if (num >= 1 && num <= 8) {
+        addElementToMix(baseElements[num - 1].id);
+        return;
+      }
+      if (key === "enter") { tryCraft(); return; }
+      if (key === "backspace") { clearMix(); return; }
+    }
+    
+    // Algebraic Geometry controls
+    if (showingAlgebraicGeometry) {
+      const num = parseInt(key);
+      if (num >= 0 && num <= 9) {
+        const idx = num === 0 ? 9 : num - 1;
+        if (idx < geometricObjects.length) {
+          addGeometricObject(geometricObjects[idx].id);
+        }
+        return;
+      }
+      if (key === "enter") { tryGeometryTheorem(); return; }
+      if (key === "backspace") { clearGeometryConstruction(); return; }
+    }
+    
+    // Topology controls
+    if (showingTopology) {
+      const num = parseInt(key);
+      if (num >= 0 && num <= 9) {
+        const idx = num === 0 ? 9 : num - 1;
+        if (idx < topologicalSpaces.length) {
+          addTopologicalSpace(topologicalSpaces[idx].id);
+        }
+        return;
+      }
+      if (key === "enter") { tryTopologyOperation(); return; }
+      if (key === "backspace") { clearTopologyConstruction(); return; }
+    }
+    
+    // Functional Analysis controls
+    if (showingFunctionalAnalysis) {
+      const num = parseInt(key);
+      if (num >= 0 && num <= 9) {
+        const idx = num === 0 ? 9 : num - 1;
+        if (idx < functionalSpaces.length) {
+          addFunctionalSpace(functionalSpaces[idx].id);
+        }
+        return;
+      }
+      if (key === "enter") { tryAnalysisTheorem(); return; }
+      if (key === "backspace") { clearAnalysisConstruction(); return; }
+    }
+    
+    // Simulation controls
+    if (simState.active) {
+      if (key === "z") { spawnEntity(simState.spawnType); return; }
+      if (key === "x") { useGodPower("lightning"); return; }
+      if (key === "n") { useGodPower("blessing"); return; }
+      if (key === ",") { useGodPower("earthquake"); return; }
+      if (key === "i") { 
+        simState.active = false;
+        switchGameMode("volleyball");
+        return;
+      }
+    }
+    
+    // Arena attack and special moves
+    if (arenaState.active) {
+      // Basic attack with weapon
+      if ((key === " " || key === "space") && arenaState.attackCooldown <= 0) {
+        if (arenaState.currentWeapon) {
+          arenaAttack(p1, p2, arenaState.currentWeapon, true);
+          arenaState.attackCooldown = arenaState.currentWeapon.cooldown;
+        } else {
+          // Punch if no weapon (basic attack)
+          arenaAttack(p1, p2, { damage: 5, knockback: 5, range: 50 }, true);
+          arenaState.attackCooldown = 15;
+        }
+      }
+      
+      // Special moves (Z, X, C, V like Smash Bros controller)
+      if (key === "z") { // Neutral special
+        performSpecialMove(p1, "neutral", true);
+      }
+      if (key === "x") { // Side special
+        performSpecialMove(p1, "side", true);
+      }
+      if (key === "c") { // Up special (recovery)
+        performSpecialMove(p1, "up", true);
+      }
+      if (key === "v") { // Down special
+        performSpecialMove(p1, "down", true);
+      }
+    }
+  }
+  
   keys[key] = true;
 });
 document.addEventListener("keyup", e => {
@@ -612,7 +3106,7 @@ class Player {
           this.lastHitFrame["dive"] = frameCount;
         }
 
-        // Jump (W or Space) – still only when grounded and not diving
+        // Jump (Arrow Up or Space) – still only when grounded and not diving
         const jumpPressed = keys[jumpKey] || keys[" "];
         if (jumpPressed && this.isGrounded() && this.diveTimer <= 0 && this.postDiveStun <= 0) {
           this.vy = -this.jumpPower * jumpMod;
@@ -679,6 +3173,13 @@ class Player {
   }
 
   draw() {
+    // Use 3D renderer if enabled
+    if (renderer3D.enabled) {
+      draw3DCharacter(this);
+      ctx.restore();
+      return;
+    }
+    
     ctx.save();
 
     // Ground shadow
@@ -1869,6 +4370,14 @@ this.hitUsed = {
 
   }
   draw() {
+    // Use 3D renderer if enabled
+    if (renderer3D.enabled) {
+      // Draw 3D ball with size modifier from power-ups
+      const sizeMultiplier = shopItems.find(i => i.id === "giantBall")?.active ? 1.5 : 1;
+      draw3DSphere(this.x, this.y, 20, this.r * sizeMultiplier, '#eaf1ff');
+      return;
+    }
+    
     ctx.save();
     // soft ground shadow
     const shadowScale = Math.max(0.35, Math.min(1, 1 - (this.y - 80) / 320));
@@ -1962,6 +4471,17 @@ applyBotDifficulty();
 const ball = new Ball();
 
 function drawNet() {
+  // Use 3D renderer if enabled
+  if (renderer3D.enabled) {
+    // 3D Net posts
+    draw3DCylinder(443, 250, 15, 4, 190, '#0e2845');
+    draw3DCylinder(453, 250, 15, 4, 190, '#0e2845');
+    
+    // 3D Net body
+    draw3DBox(445, 260, 10, 10, 170, 8, '#ffffff');
+    return;
+  }
+  
   ctx.save();
   // Posts
   ctx.shadowColor = "rgba(0,0,0,0.25)";
@@ -2130,8 +4650,8 @@ function drawKeybinds() {
   const y = 520 - 42; // align with stamina bar
   const x = staminaX + staminaWidth + 20;
 
-  const text = "W/A/D move & jump | Q spike | E set | S receive / feint (air) | F dive | Shift sprint | P/Esc pause | M mute";
-  ctx.font = "12px 'Segoe UI', Arial";
+  const text = "Arrows move | Q spike | E set | S receive | B shop | G casino | C chem | K caterpillar | T mode";
+  ctx.font = "11px 'Segoe UI', Arial";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
 
@@ -2299,6 +4819,12 @@ function drawBackground() {
   drawSand(map);
   drawSandTexture();
   drawCourtLines();
+  
+  // Add 3D ground grid when 3D mode is enabled
+  if (renderer3D.enabled) {
+    draw3DGround();
+  }
+  
   drawVignette(map);
 }
 
@@ -2792,11 +5318,11 @@ function gameLoop(now) {
 
     if (!gameOver) {
       // Updates
-      p1.update("a", "d", "w");
+      p1.update("arrowleft", "arrowright", "arrowup");
       // bot update is inside botLogic
       ball.update();
 
-      // Player 1 controls:
+      // Player 1 controls (Arrow Keys to move):
       // q = spike, e = set, s = receive (ground = high bump, air = softer)
       if (keys["e"]) ball.interact(p1, "set");
       if (keys["q"]) ball.interact(p1, "spike");
@@ -2829,7 +5355,17 @@ function gameLoop(now) {
       // Game over condition
       if (p1.score >= settings.targetScore || p2.score >= settings.targetScore) {
         gameOver = true;
+        // Handle gambling winnings
+        if (playerStats.currentBet > 0) {
+          collectMatchWinnings(p1.score >= settings.targetScore);
+        }
       }
+      
+      // Update extended systems
+      updatePowerUps();
+      updateArena();
+      updateSimulation();
+      updateCaterpillar();
     }
 
     updateFX();
@@ -2853,15 +5389,468 @@ function gameLoop(now) {
   drawSuperCharge(p1);
   drawSuperCharge(p2);
   drawKeybinds();
+  
+  // Draw extended game systems
+  drawModeSelector();
+  drawArenaUI();
+  drawSimulation();
+  drawCaterpillar();
+  
+  // Draw overlay UIs (last so they appear on top)
+  drawShop();
+  drawGambling();
+  drawChemistry();
+  drawAlgebraicGeometry();
+  drawTopology();
+  drawFunctionalAnalysis();
 
   if (gameOver) {
     drawGameOver();
   } else if (paused) {
     drawPauseOverlay();
   }
+  
+  // Update GUI elements
+  updateGUI();
 
   requestAnimationFrame(gameLoop);
 }
+
+// ================== GUI Button Functions ==================
+function toggleShop() {
+  showingShop = !showingShop;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleCasino() {
+  showingGambling = !showingGambling;
+  showingShop = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleChemistry() {
+  showingChemistry = !showingChemistry;
+  showingShop = false;
+  showingGambling = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleAlgebraicGeometry() {
+  showingAlgebraicGeometry = !showingAlgebraicGeometry;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleTopology() {
+  showingTopology = !showingTopology;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleFunctionalAnalysis() {
+  showingFunctionalAnalysis = !showingFunctionalAnalysis;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+}
+
+function toggleCaterpillar() {
+  caterpillar.active = !caterpillar.active;
+  if (caterpillar.active) {
+    caterpillar.x = 100;
+    caterpillar.hunger = 50;
+  }
+  document.getElementById('btn-feed').style.display = caterpillar.active ? 'block' : 'none';
+}
+
+function feedCaterpillarBtn() {
+  if (caterpillar.active) {
+    feedCaterpillar();
+  }
+}
+
+function switchToArena() {
+  switchGameMode("arena");
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function switchToSim() {
+  switchGameMode("simulation");
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function togglePause() {
+  paused = !paused;
+  keys = {};
+  lastTime = performance.now();
+}
+
+function updateGUI() {
+  // Update coin display
+  document.getElementById('coin-count').textContent = playerStats.coins;
+  
+  // Update caterpillar feed button visibility
+  document.getElementById('btn-feed').style.display = caterpillar.active ? 'block' : 'none';
+}
+
+// ================== Simple 3D Renderer ==================
+const renderer3D = {
+  enabled: true,
+  camera: {
+    x: 450,
+    y: 250,
+    z: -500,
+    fov: 400
+  },
+  lightSource: { x: 200, y: -300, z: -200 }
+};
+
+// Project 3D point to 2D screen coordinates
+function project3D(x, y, z) {
+  const cam = renderer3D.camera;
+  const scale = cam.fov / (cam.fov + z - cam.z);
+  return {
+    x: cam.x + (x - cam.x) * scale,
+    y: cam.y + (y - cam.y) * scale,
+    scale: scale
+  };
+}
+
+// Calculate simple lighting
+function calculateLighting(x, y, z, baseColor) {
+  const light = renderer3D.lightSource;
+  const dx = light.x - x;
+  const dy = light.y - y;
+  const dz = light.z - z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const intensity = Math.max(0.3, Math.min(1, 800 / dist));
+  return intensity;
+}
+
+// Draw a 3D sphere (for ball)
+function draw3DSphere(x, y, z, radius, color) {
+  if (!renderer3D.enabled) return;
+  
+  const projected = project3D(x, y, z);
+  const projectedRadius = radius * projected.scale;
+  const lighting = calculateLighting(x, y, z, color);
+  
+  ctx.save();
+  
+  // Main sphere with gradient for 3D effect
+  const gradient = ctx.createRadialGradient(
+    projected.x - projectedRadius * 0.3,
+    projected.y - projectedRadius * 0.3,
+    0,
+    projected.x,
+    projected.y,
+    projectedRadius
+  );
+  
+  // Parse color and apply lighting
+  gradient.addColorStop(0, `rgba(255,255,255,${0.8 * lighting})`);
+  gradient.addColorStop(0.3, color);
+  gradient.addColorStop(1, `rgba(0,0,0,${0.5})`);
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(projected.x, projected.y, projectedRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Specular highlight
+  ctx.fillStyle = `rgba(255,255,255,${0.6 * lighting})`;
+  ctx.beginPath();
+  ctx.arc(
+    projected.x - projectedRadius * 0.25,
+    projected.y - projectedRadius * 0.25,
+    projectedRadius * 0.2,
+    0, Math.PI * 2
+  );
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+// Draw a 3D box/cuboid (for players, net, etc.)
+function draw3DBox(x, y, z, width, height, depth, color, options = {}) {
+  if (!renderer3D.enabled) return;
+  
+  const lighting = calculateLighting(x + width/2, y + height/2, z);
+  
+  // Front face
+  const frontTL = project3D(x, y, z);
+  const frontTR = project3D(x + width, y, z);
+  const frontBL = project3D(x, y + height, z);
+  const frontBR = project3D(x + width, y + height, z);
+  
+  // Back face
+  const backTL = project3D(x, y, z + depth);
+  const backTR = project3D(x + width, y, z + depth);
+  const backBL = project3D(x, y + height, z + depth);
+  const backBR = project3D(x + width, y + height, z + depth);
+  
+  ctx.save();
+  
+  // Draw back face (darker)
+  ctx.fillStyle = shadeColor(color, -40);
+  ctx.beginPath();
+  ctx.moveTo(backTL.x, backTL.y);
+  ctx.lineTo(backTR.x, backTR.y);
+  ctx.lineTo(backBR.x, backBR.y);
+  ctx.lineTo(backBL.x, backBL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw top face
+  ctx.fillStyle = shadeColor(color, 20 * lighting);
+  ctx.beginPath();
+  ctx.moveTo(frontTL.x, frontTL.y);
+  ctx.lineTo(frontTR.x, frontTR.y);
+  ctx.lineTo(backTR.x, backTR.y);
+  ctx.lineTo(backTL.x, backTL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw right face
+  ctx.fillStyle = shadeColor(color, -20);
+  ctx.beginPath();
+  ctx.moveTo(frontTR.x, frontTR.y);
+  ctx.lineTo(backTR.x, backTR.y);
+  ctx.lineTo(backBR.x, backBR.y);
+  ctx.lineTo(frontBR.x, frontBR.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw front face (brightest)
+  ctx.fillStyle = shadeColor(color, 10 * lighting);
+  ctx.beginPath();
+  ctx.moveTo(frontTL.x, frontTL.y);
+  ctx.lineTo(frontTR.x, frontTR.y);
+  ctx.lineTo(frontBR.x, frontBR.y);
+  ctx.lineTo(frontBL.x, frontBL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw left face
+  ctx.fillStyle = shadeColor(color, -30);
+  ctx.beginPath();
+  ctx.moveTo(frontTL.x, frontTL.y);
+  ctx.lineTo(backTL.x, backTL.y);
+  ctx.lineTo(backBL.x, backBL.y);
+  ctx.lineTo(frontBL.x, frontBL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+// Draw 3D cylinder (for net poles)
+function draw3DCylinder(x, y, z, radius, height, color) {
+  if (!renderer3D.enabled) return;
+  
+  const segments = 8;
+  const lighting = calculateLighting(x, y, z);
+  
+  ctx.save();
+  
+  // Draw cylinder body
+  for (let i = 0; i < segments; i++) {
+    const angle1 = (i / segments) * Math.PI * 2;
+    const angle2 = ((i + 1) / segments) * Math.PI * 2;
+    
+    const x1 = x + Math.cos(angle1) * radius;
+    const z1 = z + Math.sin(angle1) * radius;
+    const x2 = x + Math.cos(angle2) * radius;
+    const z2 = z + Math.sin(angle2) * radius;
+    
+    const p1Top = project3D(x1, y, z1);
+    const p2Top = project3D(x2, y, z2);
+    const p1Bot = project3D(x1, y + height, z1);
+    const p2Bot = project3D(x2, y + height, z2);
+    
+    // Shade based on angle to light
+    const shade = Math.cos(angle1) * 30;
+    ctx.fillStyle = shadeColor(color, shade * lighting);
+    
+    ctx.beginPath();
+    ctx.moveTo(p1Top.x, p1Top.y);
+    ctx.lineTo(p2Top.x, p2Top.y);
+    ctx.lineTo(p2Bot.x, p2Bot.y);
+    ctx.lineTo(p1Bot.x, p1Bot.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  // Draw top ellipse
+  const topCenter = project3D(x, y, z);
+  ctx.fillStyle = shadeColor(color, 40 * lighting);
+  ctx.beginPath();
+  ctx.ellipse(topCenter.x, topCenter.y, radius * topCenter.scale, radius * topCenter.scale * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+// Helper to shade colors
+function shadeColor(color, percent) {
+  // Handle hex colors
+  if (color.startsWith('#')) {
+    let R = parseInt(color.substring(1, 3), 16);
+    let G = parseInt(color.substring(3, 5), 16);
+    let B = parseInt(color.substring(5, 7), 16);
+
+    R = Math.min(255, Math.max(0, R + percent));
+    G = Math.min(255, Math.max(0, G + percent));
+    B = Math.min(255, Math.max(0, B + percent));
+
+    return `rgb(${Math.round(R)},${Math.round(G)},${Math.round(B)})`;
+  }
+  // Handle rgb colors
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (match) {
+    let R = Math.min(255, Math.max(0, parseInt(match[1]) + percent));
+    let G = Math.min(255, Math.max(0, parseInt(match[2]) + percent));
+    let B = Math.min(255, Math.max(0, parseInt(match[3]) + percent));
+    return `rgb(${Math.round(R)},${Math.round(G)},${Math.round(B)})`;
+  }
+  return color;
+}
+
+// Draw 3D ground plane
+function draw3DGround() {
+  if (!renderer3D.enabled) return;
+  
+  ctx.save();
+  
+  // Draw grid lines for 3D effect
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  
+  const gridSize = 50;
+  const gridDepth = 200;
+  
+  for (let i = 0; i <= 900; i += gridSize) {
+    const front = project3D(i, groundY + 90, 0);
+    const back = project3D(i, groundY + 90, gridDepth);
+    ctx.beginPath();
+    ctx.moveTo(front.x, front.y);
+    ctx.lineTo(back.x, back.y);
+    ctx.stroke();
+  }
+  
+  for (let z = 0; z <= gridDepth; z += gridSize) {
+    const left = project3D(0, groundY + 90, z);
+    const right = project3D(900, groundY + 90, z);
+    ctx.beginPath();
+    ctx.moveTo(left.x, left.y);
+    ctx.lineTo(right.x, right.y);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+
+// Draw 3D shadow under object
+function draw3DShadow(x, y, width, height) {
+  if (!renderer3D.enabled) return;
+  
+  ctx.save();
+  const shadowY = groundY + 85;
+  const projected = project3D(x + width/2, shadowY, 20);
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(projected.x, projected.y, width * projected.scale * 0.8, height * projected.scale * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 3D Character renderer
+function draw3DCharacter(player) {
+  if (!renderer3D.enabled) return;
+  
+  const x = player.x;
+  const y = player.y;
+  const w = player.w;
+  const h = player.h;
+  const color = player.color;
+  const z = player.side === "left" ? 10 : 30; // Slight depth difference
+  
+  // Shadow
+  draw3DShadow(x, y, w, h);
+  
+  // Body (3D box)
+  draw3DBox(x + 5, y + 25, z, w - 10, h - 35, 15, color);
+  
+  // Head (3D sphere approximation using box)
+  const headSize = 18;
+  draw3DBox(x + w/2 - headSize/2, y, z + 2, headSize, headSize, 12, '#FFE4C4');
+  
+  // Arms
+  const armWidth = 6;
+  const armLength = 25;
+  draw3DBox(x - 2, y + 30, z + 5, armWidth, armLength, 5, color);
+  draw3DBox(x + w - armWidth + 2, y + 30, z + 5, armWidth, armLength, 5, color);
+  
+  // Legs
+  const legWidth = 8;
+  const legLength = 30;
+  draw3DBox(x + 8, y + h - legLength, z + 3, legWidth, legLength, 6, color);
+  draw3DBox(x + w - legWidth - 8, y + h - legLength, z + 3, legWidth, legLength, 6, color);
+}
+
+// Toggle 3D mode
+function toggle3D() {
+  renderer3D.enabled = !renderer3D.enabled;
+}
+
+function toggle3DBtn() {
+  toggle3D();
+  const btn = document.getElementById('btn-3d');
+  if (renderer3D.enabled) {
+    btn.classList.add('active');
+    btn.textContent = '🎮 3D: ON';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🎮 3D: OFF';
+  }
+}
+
+// Initialize 3D button state
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('btn-3d');
+  if (btn) {
+    btn.classList.add('active');
+    btn.textContent = '🎮 3D: ON';
+  }
+});
 
 requestAnimationFrame(gameLoop);
 </script>
