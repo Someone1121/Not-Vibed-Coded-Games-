@@ -97,6 +97,9 @@
     }
     #btn-3d { background: linear-gradient(135deg, #2196F3, #1565C0); color: white; }
     #btn-3d.active { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+    #btn-algebra { background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: white; }
+    #btn-topology { background: linear-gradient(135deg, #E91E63, #C2185B); color: white; }
+    #btn-analysis { background: linear-gradient(135deg, #3F51B5, #303F9F); color: white; }
   </style>
 </head>
 <body>
@@ -111,6 +114,9 @@
     <button class="gui-btn" id="btn-shop" onclick="toggleShop()">🛒 Shop</button>
     <button class="gui-btn" id="btn-casino" onclick="toggleCasino()">🎰 Casino</button>
     <button class="gui-btn" id="btn-chemistry" onclick="toggleChemistry()">⚗️ Chemistry</button>
+    <button class="gui-btn" id="btn-algebra" onclick="toggleAlgebraicGeometry()">📐 Alg. Geometry</button>
+    <button class="gui-btn" id="btn-topology" onclick="toggleTopology()">🔮 Topology</button>
+    <button class="gui-btn" id="btn-analysis" onclick="toggleFunctionalAnalysis()">∫ Analysis</button>
     <button class="gui-btn" id="btn-caterpillar" onclick="toggleCaterpillar()">🐛 Caterpillar</button>
     <button class="gui-btn" id="btn-feed" onclick="feedCaterpillarBtn()">🍎 Feed</button>
     <button class="gui-btn" id="btn-arena" onclick="switchToArena()">⚔️ Arena</button>
@@ -371,6 +377,117 @@ const chemistryRecipes = [
   { inputs: ["iron", "carbon"], output: "steel", name: "Steel", color: "#708090" },
   { inputs: ["silicon", "gold"], output: "computer", name: "Computer", color: "#00FFFF" }
 ];
+
+// ================== MATHEMATICS SYSTEMS ==================
+
+// Algebraic Geometry System
+const algebraicGeometryState = {
+  active: false,
+  discovered: ["point", "line", "circle"],
+  currentConstruction: [],
+  selectedTool: "point"
+};
+
+const geometricObjects = [
+  { id: "point", name: "Point", symbol: "•", color: "#FF6B6B", description: "Zero-dimensional object", tier: 1 },
+  { id: "line", name: "Line", symbol: "—", color: "#4ECDC4", description: "One-dimensional variety", tier: 1 },
+  { id: "circle", name: "Circle", symbol: "○", color: "#45B7D1", description: "Conic section x²+y²=r²", tier: 1 },
+  { id: "parabola", name: "Parabola", symbol: "∪", color: "#96CEB4", description: "Conic y=x²", tier: 2 },
+  { id: "ellipse", name: "Ellipse", symbol: "⬭", color: "#FFEAA7", description: "Conic x²/a²+y²/b²=1", tier: 2 },
+  { id: "hyperbola", name: "Hyperbola", symbol: ")(", color: "#DDA0DD", description: "Conic x²/a²-y²/b²=1", tier: 2 },
+  { id: "cubic", name: "Cubic Curve", symbol: "∿", color: "#FF7675", description: "Degree 3 polynomial", tier: 3 },
+  { id: "ellipticCurve", name: "Elliptic Curve", symbol: "ε", color: "#74B9FF", description: "y²=x³+ax+b", tier: 3 },
+  { id: "surface", name: "Algebraic Surface", symbol: "◇", color: "#A29BFE", description: "2D variety in 3-space", tier: 4 },
+  { id: "variety", name: "Projective Variety", symbol: "V", color: "#FD79A8", description: "Zero set of polynomials", tier: 4 },
+  { id: "scheme", name: "Scheme", symbol: "S", color: "#00CEC9", description: "Generalized variety", tier: 5 },
+  { id: "sheaf", name: "Sheaf", symbol: "F", color: "#E17055", description: "Local-global structure", tier: 5 }
+];
+
+const geometryTheorems = [
+  { inputs: ["point", "point"], output: "line", name: "Two Points Define Line", reward: 15 },
+  { inputs: ["line", "line"], output: "point", name: "Lines Intersect at Point", reward: 15 },
+  { inputs: ["circle", "line"], output: "parabola", name: "Conic Section Discovery", reward: 25 },
+  { inputs: ["parabola", "line"], output: "ellipse", name: "Ellipse from Parabola", reward: 30 },
+  { inputs: ["ellipse", "point"], output: "hyperbola", name: "Hyperbola Discovery", reward: 35 },
+  { inputs: ["circle", "circle", "circle"], output: "cubic", name: "Cubic Curve", reward: 50 },
+  { inputs: ["cubic", "point", "point"], output: "ellipticCurve", name: "Elliptic Curve", reward: 75 },
+  { inputs: ["ellipticCurve", "ellipticCurve"], output: "surface", name: "Algebraic Surface", reward: 100 },
+  { inputs: ["surface", "surface"], output: "variety", name: "Projective Variety", reward: 150 },
+  { inputs: ["variety", "sheaf"], output: "scheme", name: "Scheme Theory", reward: 250 }
+];
+
+// Topology System
+const topologyState = {
+  active: false,
+  discovered: ["point_top", "interval", "circle_top"],
+  spaces: []
+};
+
+const topologicalSpaces = [
+  { id: "point_top", name: "Point", symbol: "•", color: "#E74C3C", description: "Trivial topology", tier: 1, genus: 0 },
+  { id: "interval", name: "Interval [0,1]", symbol: "I", color: "#3498DB", description: "Connected space", tier: 1, genus: 0 },
+  { id: "circle_top", name: "Circle S¹", symbol: "S¹", color: "#2ECC71", description: "1-sphere, π₁=ℤ", tier: 1, genus: 1 },
+  { id: "sphere", name: "Sphere S²", symbol: "S²", color: "#9B59B6", description: "2-sphere, simply connected", tier: 2, genus: 0 },
+  { id: "torus", name: "Torus T²", symbol: "T²", color: "#F39C12", description: "Donut shape, genus 1", tier: 2, genus: 1 },
+  { id: "kleinBottle", name: "Klein Bottle", symbol: "K", color: "#1ABC9C", description: "Non-orientable surface", tier: 3, genus: 0 },
+  { id: "mobiusStrip", name: "Möbius Strip", symbol: "M", color: "#E91E63", description: "One-sided surface", tier: 3, genus: 0 },
+  { id: "projectivePlane", name: "RP²", symbol: "ℝP²", color: "#00BCD4", description: "Real projective plane", tier: 3, genus: 0 },
+  { id: "threeSphere", name: "3-Sphere S³", symbol: "S³", color: "#673AB7", description: "3-dimensional sphere", tier: 4, genus: 0 },
+  { id: "manifold", name: "n-Manifold", symbol: "M^n", color: "#FF5722", description: "Locally Euclidean space", tier: 4, genus: -1 },
+  { id: "cw_complex", name: "CW Complex", symbol: "CW", color: "#795548", description: "Cell decomposition", tier: 5, genus: -1 },
+  { id: "fiber_bundle", name: "Fiber Bundle", symbol: "E→B", color: "#607D8B", description: "Twisted product", tier: 5, genus: -1 }
+];
+
+const topologyOperations = [
+  { inputs: ["interval", "interval"], output: "sphere", name: "Suspension", reward: 20 },
+  { inputs: ["circle_top", "circle_top"], output: "torus", name: "Product Space T²=S¹×S¹", reward: 30 },
+  { inputs: ["interval", "mobiusStrip"], output: "kleinBottle", name: "Klein Bottle Construction", reward: 50 },
+  { inputs: ["circle_top", "interval"], output: "mobiusStrip", name: "Möbius Strip", reward: 40 },
+  { inputs: ["sphere", "point_top"], output: "projectivePlane", name: "Quotient RP²", reward: 45 },
+  { inputs: ["sphere", "sphere"], output: "threeSphere", name: "Join to S³", reward: 60 },
+  { inputs: ["torus", "torus"], output: "manifold", name: "Connected Sum", reward: 80 },
+  { inputs: ["manifold", "interval"], output: "cw_complex", name: "CW Structure", reward: 100 },
+  { inputs: ["cw_complex", "circle_top"], output: "fiber_bundle", name: "Fiber Bundle", reward: 150 }
+];
+
+// Advanced Functional Analysis System
+const functionalAnalysisState = {
+  active: false,
+  discovered: ["real_numbers", "sequence", "continuous_func"],
+  currentConstruction: []
+};
+
+const functionalSpaces = [
+  { id: "real_numbers", name: "ℝ", symbol: "ℝ", color: "#E74C3C", description: "Real number field", tier: 1 },
+  { id: "sequence", name: "Sequence Space", symbol: "ℓ", color: "#3498DB", description: "Space of sequences", tier: 1 },
+  { id: "continuous_func", name: "C[a,b]", symbol: "C", color: "#2ECC71", description: "Continuous functions", tier: 1 },
+  { id: "lp_space", name: "Lᵖ Space", symbol: "Lᵖ", color: "#9B59B6", description: "p-integrable functions", tier: 2 },
+  { id: "l2_space", name: "ℓ² Space", symbol: "ℓ²", color: "#F39C12", description: "Square-summable sequences", tier: 2 },
+  { id: "banach", name: "Banach Space", symbol: "B", color: "#1ABC9C", description: "Complete normed space", tier: 3 },
+  { id: "hilbert", name: "Hilbert Space", symbol: "H", color: "#E91E63", description: "Complete inner product", tier: 3 },
+  { id: "sobolev", name: "Sobolev Space", symbol: "W^{k,p}", color: "#00BCD4", description: "Weak derivatives in Lᵖ", tier: 4 },
+  { id: "dual_space", name: "Dual Space", symbol: "X*", color: "#673AB7", description: "Bounded linear functionals", tier: 4 },
+  { id: "operator_algebra", name: "B(H)", symbol: "B(H)", color: "#FF5722", description: "Bounded operators on H", tier: 5 },
+  { id: "c_star", name: "C*-Algebra", symbol: "A*", color: "#795548", description: "Involutive Banach algebra", tier: 5 },
+  { id: "von_neumann", name: "von Neumann Algebra", symbol: "M", color: "#607D8B", description: "W*-algebra", tier: 6 }
+];
+
+const analysisTheorems = [
+  { inputs: ["sequence", "sequence"], output: "l2_space", name: "ℓ² Construction", reward: 20 },
+  { inputs: ["continuous_func", "continuous_func"], output: "lp_space", name: "Lᵖ Space", reward: 25 },
+  { inputs: ["lp_space", "real_numbers"], output: "banach", name: "Banach Space Completion", reward: 40 },
+  { inputs: ["l2_space", "l2_space"], output: "hilbert", name: "Hilbert Space", reward: 50 },
+  { inputs: ["banach", "continuous_func"], output: "sobolev", name: "Sobolev Embedding", reward: 60 },
+  { inputs: ["banach", "banach"], output: "dual_space", name: "Hahn-Banach Theorem", reward: 75 },
+  { inputs: ["hilbert", "hilbert"], output: "operator_algebra", name: "Operator Theory", reward: 100 },
+  { inputs: ["operator_algebra", "dual_space"], output: "c_star", name: "C*-Algebra", reward: 150 },
+  { inputs: ["c_star", "c_star"], output: "von_neumann", name: "von Neumann Algebra", reward: 250 }
+];
+
+// UI state for math modules
+let showingAlgebraicGeometry = false;
+let showingTopology = false;
+let showingFunctionalAnalysis = false;
 
 // ================== Game Mode Functions ==================
 function switchGameMode(mode) {
@@ -919,6 +1036,146 @@ function tryCraft() {
   return null;
 }
 
+// ================== Algebraic Geometry Functions ==================
+function addGeometricObject(objectId) {
+  if (algebraicGeometryState.currentConstruction.length >= 4) return;
+  
+  const obj = geometricObjects.find(o => o.id === objectId);
+  if (obj && algebraicGeometryState.discovered.includes(objectId)) {
+    algebraicGeometryState.currentConstruction.push(objectId);
+  }
+}
+
+function clearGeometryConstruction() {
+  algebraicGeometryState.currentConstruction = [];
+}
+
+function tryGeometryTheorem() {
+  if (algebraicGeometryState.currentConstruction.length < 2) return null;
+  
+  const sorted = [...algebraicGeometryState.currentConstruction].sort();
+  
+  for (const theorem of geometryTheorems) {
+    const theoremSorted = [...theorem.inputs].sort();
+    if (sorted.length === theoremSorted.length && 
+        sorted.every((val, idx) => val === theoremSorted[idx])) {
+      
+      if (!algebraicGeometryState.discovered.includes(theorem.output)) {
+        algebraicGeometryState.discovered.push(theorem.output);
+        playerStats.coins += theorem.reward;
+        
+        // Special effects
+        const obj = geometricObjects.find(o => o.id === theorem.output);
+        if (obj) {
+          spawnBurst(450, 250, { color: obj.color, count: 25, spread: 2, speed: 6 });
+          if (obj.tier >= 4) {
+            cameraShake = 15;
+          }
+        }
+      }
+      
+      algebraicGeometryState.currentConstruction = [];
+      return theorem;
+    }
+  }
+  
+  algebraicGeometryState.currentConstruction = [];
+  return null;
+}
+
+// ================== Topology Functions ==================
+function addTopologicalSpace(spaceId) {
+  if (topologyState.spaces.length >= 3) return;
+  
+  const space = topologicalSpaces.find(s => s.id === spaceId);
+  if (space && topologyState.discovered.includes(spaceId)) {
+    topologyState.spaces.push(spaceId);
+  }
+}
+
+function clearTopologyConstruction() {
+  topologyState.spaces = [];
+}
+
+function tryTopologyOperation() {
+  if (topologyState.spaces.length < 2) return null;
+  
+  const sorted = [...topologyState.spaces].sort();
+  
+  for (const op of topologyOperations) {
+    const opSorted = [...op.inputs].sort();
+    if (sorted.length === opSorted.length && 
+        sorted.every((val, idx) => val === opSorted[idx])) {
+      
+      if (!topologyState.discovered.includes(op.output)) {
+        topologyState.discovered.push(op.output);
+        playerStats.coins += op.reward;
+        
+        const space = topologicalSpaces.find(s => s.id === op.output);
+        if (space) {
+          spawnBurst(450, 250, { color: space.color, count: 30, spread: 2.5, speed: 5 });
+          if (space.tier >= 4) {
+            cameraShake = 20;
+          }
+        }
+      }
+      
+      topologyState.spaces = [];
+      return op;
+    }
+  }
+  
+  topologyState.spaces = [];
+  return null;
+}
+
+// ================== Functional Analysis Functions ==================
+function addFunctionalSpace(spaceId) {
+  if (functionalAnalysisState.currentConstruction.length >= 3) return;
+  
+  const space = functionalSpaces.find(s => s.id === spaceId);
+  if (space && functionalAnalysisState.discovered.includes(spaceId)) {
+    functionalAnalysisState.currentConstruction.push(spaceId);
+  }
+}
+
+function clearAnalysisConstruction() {
+  functionalAnalysisState.currentConstruction = [];
+}
+
+function tryAnalysisTheorem() {
+  if (functionalAnalysisState.currentConstruction.length < 2) return null;
+  
+  const sorted = [...functionalAnalysisState.currentConstruction].sort();
+  
+  for (const theorem of analysisTheorems) {
+    const theoremSorted = [...theorem.inputs].sort();
+    if (sorted.length === theoremSorted.length && 
+        sorted.every((val, idx) => val === theoremSorted[idx])) {
+      
+      if (!functionalAnalysisState.discovered.includes(theorem.output)) {
+        functionalAnalysisState.discovered.push(theorem.output);
+        playerStats.coins += theorem.reward;
+        
+        const space = functionalSpaces.find(s => s.id === theorem.output);
+        if (space) {
+          spawnBurst(450, 250, { color: space.color, count: 35, spread: 2, speed: 7 });
+          if (space.tier >= 5) {
+            cameraShake = 25;
+            playerStats.coins += 50; // Bonus for advanced theorems
+          }
+        }
+      }
+      
+      functionalAnalysisState.currentConstruction = [];
+      return theorem;
+    }
+  }
+  
+  functionalAnalysisState.currentConstruction = [];
+  return null;
+}
+
 // ================== Extended Drawing Functions ==================
 function drawShop() {
   if (!showingShop) return;
@@ -1164,6 +1421,502 @@ function drawChemistry() {
   ctx.font = "14px Arial";
   ctx.textAlign = "center";
   ctx.fillText("Enter to Craft | Backspace to Clear | C to close lab", 450, 455);
+  
+  ctx.restore();
+}
+
+// ================== Algebraic Geometry Drawing ==================
+function drawAlgebraicGeometry() {
+  if (!showingAlgebraicGeometry) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Panel
+  ctx.fillStyle = "rgba(40,20,60,0.95)";
+  ctx.fillRect(50, 20, 800, 460);
+  ctx.strokeStyle = "#9C27B0";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 20, 800, 460);
+  
+  // Title
+  ctx.fillStyle = "#E1BEE7";
+  ctx.font = "bold 26px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("📐 ALGEBRAIC GEOMETRY LAB 📐", 450, 55);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.fillText(`Discovered: ${algebraicGeometryState.discovered.length}/${geometricObjects.length}`, 450, 80);
+  
+  // Objects grid
+  ctx.fillStyle = "#CCC";
+  ctx.font = "11px Arial";
+  ctx.fillText("Geometric Objects (Click or press 1-9,0 to add):", 300, 100);
+  
+  let x = 70, y = 115;
+  for (let i = 0; i < geometricObjects.length; i++) {
+    const obj = geometricObjects[i];
+    const unlocked = algebraicGeometryState.discovered.includes(obj.id);
+    
+    ctx.fillStyle = unlocked ? obj.color : "#333";
+    ctx.fillRect(x, y, 62, 55);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 62, 55);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 18px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(obj.symbol, x + 31, y + 25);
+    ctx.font = "8px Arial";
+    ctx.fillText(obj.name.substring(0, 10), x + 31, y + 40);
+    ctx.font = "9px Arial";
+    ctx.fillText(`[${(i + 1) % 10}]`, x + 31, y + 50);
+    
+    x += 68;
+    if (x > 800) { x = 70; y += 60; }
+  }
+  
+  // Construction area
+  ctx.fillStyle = "rgba(80,40,100,0.8)";
+  ctx.fillRect(70, 290, 350, 80);
+  ctx.strokeStyle = "#CE93D8";
+  ctx.strokeRect(70, 290, 350, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Construction:", 80, 310);
+  
+  let consX = 85;
+  for (const objId of algebraicGeometryState.currentConstruction) {
+    const obj = geometricObjects.find(o => o.id === objId);
+    if (obj) {
+      ctx.fillStyle = obj.color;
+      ctx.beginPath();
+      ctx.arc(consX + 18, 345, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(obj.symbol, consX + 18, 350);
+      consX += 45;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 290, 380, 80);
+  ctx.strokeStyle = "#A5D6A7";
+  ctx.strokeRect(450, 290, 380, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Theorem Result:", 460, 310);
+  
+  // Theorems list
+  ctx.fillStyle = "#AAA";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Available Theorems:", 450, 395);
+  
+  let thX = 100;
+  for (const theorem of geometryTheorems) {
+    const canMake = theorem.inputs.every(i => algebraicGeometryState.discovered.includes(i));
+    const made = algebraicGeometryState.discovered.includes(theorem.output);
+    ctx.fillStyle = made ? "#4CAF50" : (canMake ? "#FFF" : "#555");
+    ctx.font = "9px Arial";
+    ctx.fillText(theorem.name.substring(0, 15), thX, 415);
+    thX += 90;
+    if (thX > 800) break;
+  }
+  
+  // Visualization area - draw a simple geometric visualization
+  ctx.fillStyle = "rgba(20,10,30,0.9)";
+  ctx.fillRect(600, 115, 230, 160);
+  ctx.strokeStyle = "#7B1FA2";
+  ctx.strokeRect(600, 115, 230, 160);
+  
+  ctx.fillStyle = "#CE93D8";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Visualization", 715, 130);
+  
+  // Draw animated geometric shapes
+  const t = Date.now() / 1000;
+  ctx.strokeStyle = "#E1BEE7";
+  ctx.lineWidth = 2;
+  
+  // Animated ellipse
+  ctx.beginPath();
+  ctx.ellipse(715, 195, 50 + Math.sin(t) * 10, 30 + Math.cos(t) * 5, t * 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Parametric curve
+  ctx.strokeStyle = "#F48FB1";
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const angle = (i / 100) * Math.PI * 2;
+    const r = 40 + 15 * Math.sin(3 * angle + t);
+    const px = 715 + r * Math.cos(angle);
+    const py = 195 + r * Math.sin(angle);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Apply Theorem | Backspace to Clear | Click button to close", 450, 465);
+  
+  ctx.restore();
+}
+
+// ================== Topology Drawing ==================
+function drawTopology() {
+  if (!showingTopology) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Panel
+  ctx.fillStyle = "rgba(50,20,40,0.95)";
+  ctx.fillRect(50, 20, 800, 460);
+  ctx.strokeStyle = "#E91E63";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 20, 800, 460);
+  
+  // Title
+  ctx.fillStyle = "#F8BBD9";
+  ctx.font = "bold 26px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🔮 TOPOLOGY LAB 🔮", 450, 55);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.fillText(`Discovered: ${topologyState.discovered.length}/${topologicalSpaces.length}`, 450, 80);
+  
+  // Spaces grid
+  ctx.fillStyle = "#CCC";
+  ctx.font = "11px Arial";
+  ctx.fillText("Topological Spaces (Click or press 1-9,0 to add):", 300, 100);
+  
+  let x = 70, y = 115;
+  for (let i = 0; i < topologicalSpaces.length; i++) {
+    const space = topologicalSpaces[i];
+    const unlocked = topologyState.discovered.includes(space.id);
+    
+    ctx.fillStyle = unlocked ? space.color : "#333";
+    ctx.fillRect(x, y, 62, 55);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 62, 55);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 16px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(space.symbol, x + 31, y + 25);
+    ctx.font = "8px Arial";
+    ctx.fillText(space.name.substring(0, 10), x + 31, y + 40);
+    ctx.font = "9px Arial";
+    ctx.fillText(`[${(i + 1) % 10}]`, x + 31, y + 50);
+    
+    x += 68;
+    if (x > 800) { x = 70; y += 60; }
+  }
+  
+  // Construction area
+  ctx.fillStyle = "rgba(80,30,50,0.8)";
+  ctx.fillRect(70, 290, 350, 80);
+  ctx.strokeStyle = "#F48FB1";
+  ctx.strokeRect(70, 290, 350, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Space Construction:", 80, 310);
+  
+  let spX = 85;
+  for (const spaceId of topologyState.spaces) {
+    const space = topologicalSpaces.find(s => s.id === spaceId);
+    if (space) {
+      ctx.fillStyle = space.color;
+      ctx.beginPath();
+      ctx.arc(spX + 18, 345, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(space.symbol, spX + 18, 350);
+      spX += 45;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 290, 380, 80);
+  ctx.strokeStyle = "#A5D6A7";
+  ctx.strokeRect(450, 290, 380, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Operation Result:", 460, 310);
+  
+  // Operations list
+  ctx.fillStyle = "#AAA";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Available Operations:", 450, 395);
+  
+  let opX = 100;
+  for (const op of topologyOperations) {
+    const canMake = op.inputs.every(i => topologyState.discovered.includes(i));
+    const made = topologyState.discovered.includes(op.output);
+    ctx.fillStyle = made ? "#4CAF50" : (canMake ? "#FFF" : "#555");
+    ctx.font = "9px Arial";
+    ctx.fillText(op.name.substring(0, 18), opX, 415);
+    opX += 95;
+    if (opX > 800) break;
+  }
+  
+  // Visualization area - topological shapes
+  ctx.fillStyle = "rgba(30,10,20,0.9)";
+  ctx.fillRect(600, 115, 230, 160);
+  ctx.strokeStyle = "#C2185B";
+  ctx.strokeRect(600, 115, 230, 160);
+  
+  ctx.fillStyle = "#F8BBD9";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Topological Space", 715, 130);
+  
+  // Draw animated torus
+  const t = Date.now() / 1000;
+  ctx.strokeStyle = "#E91E63";
+  ctx.lineWidth = 1.5;
+  
+  // Torus cross-section animation
+  for (let j = 0; j < 8; j++) {
+    ctx.beginPath();
+    const phase = (j / 8) * Math.PI * 2 + t;
+    for (let i = 0; i <= 50; i++) {
+      const angle = (i / 50) * Math.PI * 2;
+      const r = 25 + 12 * Math.cos(phase);
+      const px = 715 + r * Math.cos(angle);
+      const py = 195 + r * Math.sin(angle) * 0.4 + 15 * Math.sin(phase);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(phase);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  
+  // Möbius strip hint
+  ctx.strokeStyle = "#F48FB1";
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const u = (i / 100) * Math.PI * 2;
+    const v = Math.sin(t + u * 2) * 0.5;
+    const px = 715 + (35 + 10 * v * Math.cos(u / 2)) * Math.cos(u);
+    const py = 230 + (35 + 10 * v * Math.cos(u / 2)) * Math.sin(u) * 0.3;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Apply Operation | Backspace to Clear | Click button to close", 450, 465);
+  
+  ctx.restore();
+}
+
+// ================== Functional Analysis Drawing ==================
+function drawFunctionalAnalysis() {
+  if (!showingFunctionalAnalysis) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Panel
+  ctx.fillStyle = "rgba(20,30,60,0.95)";
+  ctx.fillRect(50, 20, 800, 460);
+  ctx.strokeStyle = "#3F51B5";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 20, 800, 460);
+  
+  // Title
+  ctx.fillStyle = "#C5CAE9";
+  ctx.font = "bold 24px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("∫ ADVANCED FUNCTIONAL ANALYSIS ∫", 450, 55);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.fillText(`Discovered: ${functionalAnalysisState.discovered.length}/${functionalSpaces.length}`, 450, 80);
+  
+  // Spaces grid
+  ctx.fillStyle = "#CCC";
+  ctx.font = "11px Arial";
+  ctx.fillText("Function Spaces (Click or press 1-9,0 to add):", 300, 100);
+  
+  let x = 70, y = 115;
+  for (let i = 0; i < functionalSpaces.length; i++) {
+    const space = functionalSpaces[i];
+    const unlocked = functionalAnalysisState.discovered.includes(space.id);
+    
+    ctx.fillStyle = unlocked ? space.color : "#333";
+    ctx.fillRect(x, y, 62, 55);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 62, 55);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 14px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(space.symbol, x + 31, y + 25);
+    ctx.font = "8px Arial";
+    ctx.fillText(space.name.substring(0, 10), x + 31, y + 40);
+    ctx.font = "9px Arial";
+    ctx.fillText(`[${(i + 1) % 10}]`, x + 31, y + 50);
+    
+    x += 68;
+    if (x > 800) { x = 70; y += 60; }
+  }
+  
+  // Construction area
+  ctx.fillStyle = "rgba(40,50,100,0.8)";
+  ctx.fillRect(70, 290, 350, 80);
+  ctx.strokeStyle = "#7986CB";
+  ctx.strokeRect(70, 290, 350, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Space Construction:", 80, 310);
+  
+  let faX = 85;
+  for (const spaceId of functionalAnalysisState.currentConstruction) {
+    const space = functionalSpaces.find(s => s.id === spaceId);
+    if (space) {
+      ctx.fillStyle = space.color;
+      ctx.beginPath();
+      ctx.arc(faX + 18, 345, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 12px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(space.symbol, faX + 18, 350);
+      faX += 45;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 290, 380, 80);
+  ctx.strokeStyle = "#A5D6A7";
+  ctx.strokeRect(450, 290, 380, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "13px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Theorem Result:", 460, 310);
+  
+  // Theorems list
+  ctx.fillStyle = "#AAA";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Available Theorems:", 450, 395);
+  
+  let thX = 100;
+  for (const theorem of analysisTheorems) {
+    const canMake = theorem.inputs.every(i => functionalAnalysisState.discovered.includes(i));
+    const made = functionalAnalysisState.discovered.includes(theorem.output);
+    ctx.fillStyle = made ? "#4CAF50" : (canMake ? "#FFF" : "#555");
+    ctx.font = "9px Arial";
+    ctx.fillText(theorem.name.substring(0, 18), thX, 415);
+    thX += 95;
+    if (thX > 800) break;
+  }
+  
+  // Visualization area - function space
+  ctx.fillStyle = "rgba(15,20,40,0.9)";
+  ctx.fillRect(600, 115, 230, 160);
+  ctx.strokeStyle = "#303F9F";
+  ctx.strokeRect(600, 115, 230, 160);
+  
+  ctx.fillStyle = "#C5CAE9";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Function Space", 715, 130);
+  
+  // Draw animated function visualization
+  const t = Date.now() / 1000;
+  
+  // Draw coordinate axes
+  ctx.strokeStyle = "#5C6BC0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(620, 195);
+  ctx.lineTo(810, 195);
+  ctx.moveTo(715, 140);
+  ctx.lineTo(715, 260);
+  ctx.stroke();
+  
+  // Animated Fourier-like series
+  ctx.strokeStyle = "#7986CB";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i <= 180; i++) {
+    const x = 620 + i;
+    const u = (i - 90) / 30;
+    let y = 0;
+    for (let n = 1; n <= 5; n++) {
+      y += Math.sin(n * u + t * n * 0.3) / n;
+    }
+    y = 195 - y * 25;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  
+  // Draw basis functions hint
+  ctx.strokeStyle = "#9FA8DA";
+  ctx.globalAlpha = 0.5;
+  for (let n = 1; n <= 3; n++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 180; i++) {
+      const x = 620 + i;
+      const u = (i - 90) / 30;
+      const y = 195 - Math.sin(n * u + t) * 15 / n;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  
+  // Norm indicator
+  ctx.fillStyle = "#3F51B5";
+  ctx.font = "10px Arial";
+  ctx.fillText("||f||₂ = " + (2 + Math.sin(t)).toFixed(2), 715, 265);
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Apply Theorem | Backspace to Clear | Click button to close", 450, 465);
   
   ctx.restore();
 }
@@ -1481,6 +2234,48 @@ document.addEventListener("keydown", e => {
       }
       if (key === "enter") { tryCraft(); return; }
       if (key === "backspace") { clearMix(); return; }
+    }
+    
+    // Algebraic Geometry controls
+    if (showingAlgebraicGeometry) {
+      const num = parseInt(key);
+      if (num >= 0 && num <= 9) {
+        const idx = num === 0 ? 9 : num - 1;
+        if (idx < geometricObjects.length) {
+          addGeometricObject(geometricObjects[idx].id);
+        }
+        return;
+      }
+      if (key === "enter") { tryGeometryTheorem(); return; }
+      if (key === "backspace") { clearGeometryConstruction(); return; }
+    }
+    
+    // Topology controls
+    if (showingTopology) {
+      const num = parseInt(key);
+      if (num >= 0 && num <= 9) {
+        const idx = num === 0 ? 9 : num - 1;
+        if (idx < topologicalSpaces.length) {
+          addTopologicalSpace(topologicalSpaces[idx].id);
+        }
+        return;
+      }
+      if (key === "enter") { tryTopologyOperation(); return; }
+      if (key === "backspace") { clearTopologyConstruction(); return; }
+    }
+    
+    // Functional Analysis controls
+    if (showingFunctionalAnalysis) {
+      const num = parseInt(key);
+      if (num >= 0 && num <= 9) {
+        const idx = num === 0 ? 9 : num - 1;
+        if (idx < functionalSpaces.length) {
+          addFunctionalSpace(functionalSpaces[idx].id);
+        }
+        return;
+      }
+      if (key === "enter") { tryAnalysisTheorem(); return; }
+      if (key === "backspace") { clearAnalysisConstruction(); return; }
     }
     
     // Simulation controls
@@ -4124,6 +4919,9 @@ function gameLoop(now) {
   drawShop();
   drawGambling();
   drawChemistry();
+  drawAlgebraicGeometry();
+  drawTopology();
+  drawFunctionalAnalysis();
 
   if (gameOver) {
     drawGameOver();
@@ -4142,18 +4940,54 @@ function toggleShop() {
   showingShop = !showingShop;
   showingGambling = false;
   showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
 }
 
 function toggleCasino() {
   showingGambling = !showingGambling;
   showingShop = false;
   showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
 }
 
 function toggleChemistry() {
   showingChemistry = !showingChemistry;
   showingShop = false;
   showingGambling = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleAlgebraicGeometry() {
+  showingAlgebraicGeometry = !showingAlgebraicGeometry;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleTopology() {
+  showingTopology = !showingTopology;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingFunctionalAnalysis = false;
+}
+
+function toggleFunctionalAnalysis() {
+  showingFunctionalAnalysis = !showingFunctionalAnalysis;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
 }
 
 function toggleCaterpillar() {
@@ -4176,6 +5010,9 @@ function switchToArena() {
   showingShop = false;
   showingGambling = false;
   showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
 }
 
 function switchToSim() {
@@ -4183,6 +5020,9 @@ function switchToSim() {
   showingShop = false;
   showingGambling = false;
   showingChemistry = false;
+  showingAlgebraicGeometry = false;
+  showingTopology = false;
+  showingFunctionalAnalysis = false;
 }
 
 function togglePause() {
