@@ -280,27 +280,61 @@ const shopItems = [
   { id: "autoReceive", name: "Auto Receive", cost: 100, duration: 300, description: "Auto-catch nearby balls", active: false, timer: 0 }
 ];
 
-// Arena Battle System (Smash Bros Style)
+// Arena Battle System (Super Smash Bros Style)
 const arenaState = {
   active: false,
-  playerHealth: 100,
-  cpuHealth: 100,
-  playerDamage: 0, // Knockback multiplier
+  playerStocks: 3,
+  cpuStocks: 3,
+  playerDamage: 0, // Percentage damage (affects knockback)
   cpuDamage: 0,
   weapons: [],
+  items: [],
   currentWeapon: null,
   cpuWeapon: null,
   attackCooldown: 0,
-  cpuAttackCooldown: 0
+  cpuAttackCooldown: 0,
+  playerSpecialCharge: 0,
+  cpuSpecialCharge: 0,
+  comboCount: 0,
+  lastHitTime: 0,
+  platforms: [
+    { x: 200, y: 320, w: 150, h: 15 },
+    { x: 550, y: 320, w: 150, h: 15 },
+    { x: 375, y: 220, w: 150, h: 15 }
+  ],
+  projectiles: [],
+  respawnTimer: 0,
+  cpuRespawnTimer: 0,
+  screenKO: null, // For dramatic KO effects
+  announcer: null
 };
 
 const weaponTypes = [
-  { id: "sword", name: "Sword", damage: 15, knockback: 8, range: 60, cooldown: 30, color: "#silver" },
-  { id: "hammer", name: "Hammer", damage: 25, knockback: 15, range: 45, cooldown: 50, color: "#8B4513" },
-  { id: "bow", name: "Bow", damage: 10, knockback: 5, range: 200, cooldown: 40, color: "#DEB887", projectile: true },
-  { id: "bomb", name: "Bomb", damage: 30, knockback: 20, range: 80, cooldown: 90, color: "#333", explosive: true },
-  { id: "staff", name: "Magic Staff", damage: 18, knockback: 12, range: 150, cooldown: 35, color: "#9932CC", projectile: true }
+  { id: "sword", name: "Sword", damage: 12, knockback: 10, range: 70, cooldown: 20, color: "#C0C0C0", swingArc: true },
+  { id: "hammer", name: "Hammer", damage: 28, knockback: 25, range: 50, cooldown: 45, color: "#8B4513", smashAttack: true },
+  { id: "bow", name: "Bow", damage: 8, knockback: 6, range: 300, cooldown: 35, color: "#DEB887", projectile: true },
+  { id: "bomb", name: "Bomb", damage: 22, knockback: 30, range: 100, cooldown: 60, color: "#333", explosive: true, throwable: true },
+  { id: "staff", name: "Magic Staff", damage: 15, knockback: 12, range: 200, cooldown: 30, color: "#9932CC", projectile: true, magic: true },
+  { id: "bat", name: "Home Run Bat", damage: 35, knockback: 50, range: 60, cooldown: 80, color: "#8B0000", homeRun: true },
+  { id: "fan", name: "Fan", damage: 3, knockback: 2, range: 40, cooldown: 5, color: "#FFD700", rapidFire: true }
 ];
+
+const smashItems = [
+  { id: "heart", name: "Heart", effect: "heal", value: 30, color: "#FF69B4" },
+  { id: "star", name: "Star", effect: "invincible", duration: 300, color: "#FFD700" },
+  { id: "mushroom", name: "Mushroom", effect: "grow", duration: 400, color: "#FF0000" },
+  { id: "lightning", name: "Lightning", effect: "shrinkEnemy", duration: 350, color: "#FFFF00" }
+];
+
+// Special moves for each character
+const specialMoves = {
+  player: {
+    neutral: { name: "Energy Ball", damage: 12, knockback: 8, charge: 25 },
+    side: { name: "Dash Attack", damage: 15, knockback: 12, charge: 20 },
+    up: { name: "Rising Strike", damage: 10, knockback: 15, charge: 30, recovery: true },
+    down: { name: "Ground Pound", damage: 18, knockback: 20, charge: 35 }
+  }
+};
 
 // Life Simulation System (WorldBox Style)
 const simState = {
@@ -500,11 +534,23 @@ function switchGameMode(mode) {
   // Reset specific mode states
   if (mode === "arena") {
     arenaState.active = true;
-    arenaState.playerHealth = 100;
-    arenaState.cpuHealth = 100;
+    arenaState.playerStocks = 3;
+    arenaState.cpuStocks = 3;
     arenaState.playerDamage = 0;
     arenaState.cpuDamage = 0;
+    arenaState.playerSpecialCharge = 0;
+    arenaState.cpuSpecialCharge = 0;
+    arenaState.weapons = [];
+    arenaState.items = [];
+    arenaState.projectiles = [];
+    arenaState.comboCount = 0;
+    arenaState.respawnTimer = 0;
+    arenaState.cpuRespawnTimer = 0;
+    arenaState.screenKO = null;
+    arenaState.announcer = "READY... FIGHT!";
+    setTimeout(() => arenaState.announcer = null, 2000);
     spawnArenaWeapon();
+    spawnArenaItem();
   } else {
     arenaState.active = false;
   }
@@ -643,97 +689,375 @@ function updatePowerUps() {
   }
 }
 
-// ================== Arena Battle Functions ==================
+// ================== Arena Battle Functions (Super Smash Bros Style) ==================
 function spawnArenaWeapon() {
   if (arenaState.weapons.length < 3) {
     const type = weaponTypes[Math.floor(Math.random() * weaponTypes.length)];
+    // Spawn on platforms or ground
+    const spawnLocations = [
+      { x: 250, y: 300 },
+      { x: 450, y: 200 },
+      { x: 650, y: 300 },
+      { x: 450, y: groundY - 20 }
+    ];
+    const loc = spawnLocations[Math.floor(Math.random() * spawnLocations.length)];
     arenaState.weapons.push({
       ...type,
-      x: 100 + Math.random() * 700,
-      y: groundY - 20,
+      x: loc.x + (Math.random() - 0.5) * 50,
+      y: loc.y,
+      spawned: frameCount,
+      floatOffset: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function spawnArenaItem() {
+  if (arenaState.items.length < 2 && Math.random() < 0.3) {
+    const item = smashItems[Math.floor(Math.random() * smashItems.length)];
+    arenaState.items.push({
+      ...item,
+      x: 150 + Math.random() * 600,
+      y: 100 + Math.random() * 200,
       spawned: frameCount
     });
   }
 }
 
 function pickupWeapon(player, isPlayer = true) {
+  const px = player.x + player.w / 2;
+  const py = player.y + player.h / 2;
+  
+  // Check weapons
   for (let i = arenaState.weapons.length - 1; i >= 0; i--) {
     const weapon = arenaState.weapons[i];
-    const px = player.x + player.w / 2;
-    const dist = Math.abs(px - weapon.x);
-    if (dist < 50 && player.y >= groundY - 20) {
+    const dist = Math.hypot(px - weapon.x, py - weapon.y);
+    if (dist < 50) {
       if (isPlayer) {
         arenaState.currentWeapon = weapon;
       } else {
         arenaState.cpuWeapon = weapon;
       }
       arenaState.weapons.splice(i, 1);
+      playSound("bump", { intensity: 0.5 });
+      return true;
+    }
+  }
+  
+  // Check items
+  for (let i = arenaState.items.length - 1; i >= 0; i--) {
+    const item = arenaState.items[i];
+    const dist = Math.hypot(px - item.x, py - item.y);
+    if (dist < 40) {
+      applySmashItem(item, isPlayer);
+      arenaState.items.splice(i, 1);
       return true;
     }
   }
   return false;
 }
 
+function applySmashItem(item, isPlayer) {
+  switch(item.effect) {
+    case "heal":
+      if (isPlayer) {
+        arenaState.playerDamage = Math.max(0, arenaState.playerDamage - item.value);
+      } else {
+        arenaState.cpuDamage = Math.max(0, arenaState.cpuDamage - item.value);
+      }
+      spawnBurst(item.x, item.y, { color: "#FF69B4", count: 20 });
+      break;
+    case "invincible":
+      // Add temporary invincibility
+      if (isPlayer) {
+        arenaState.playerInvincible = item.duration;
+      } else {
+        arenaState.cpuInvincible = item.duration;
+      }
+      spawnBurst(item.x, item.y, { color: "#FFD700", count: 30 });
+      break;
+  }
+  playSound("spike", { intensity: 1 });
+}
+
 function arenaAttack(attacker, defender, weapon, isPlayer) {
-  if (!weapon) return;
+  if (!weapon) return false;
   
   const attackerX = attacker.x + attacker.w / 2;
+  const attackerY = attacker.y + attacker.h / 2;
   const defenderX = defender.x + defender.w / 2;
-  const dist = Math.abs(attackerX - defenderX);
+  const defenderY = defender.y + defender.h / 2;
+  const dist = Math.hypot(attackerX - defenderX, attackerY - defenderY);
+  
+  // Check invincibility
+  if (isPlayer && arenaState.cpuInvincible > 0) return false;
+  if (!isPlayer && arenaState.playerInvincible > 0) return false;
   
   if (dist <= weapon.range) {
     const damage = weapon.damage;
-    const knockback = weapon.knockback * (1 + (isPlayer ? arenaState.cpuDamage : arenaState.playerDamage) / 100);
+    // Smash Bros formula: knockback scales with damage percentage
+    const targetDamage = isPlayer ? arenaState.cpuDamage : arenaState.playerDamage;
+    const knockbackMultiplier = 1 + (targetDamage / 50);
+    const knockback = weapon.knockback * knockbackMultiplier;
+    
+    // Direction of knockback
+    const angle = Math.atan2(defenderY - attackerY, defenderX - attackerX);
+    const kbX = Math.cos(angle) * knockback;
+    const kbY = Math.sin(angle) * knockback - knockback * 0.3; // Upward bias like Smash
     
     if (isPlayer) {
-      arenaState.cpuHealth -= damage;
       arenaState.cpuDamage += damage;
-      defender.x += (defenderX > attackerX ? 1 : -1) * knockback;
-      defender.vy = -knockback * 0.5;
+      defender.x += kbX;
+      defender.vy = Math.min(defender.vy + kbY, -5);
+      arenaState.comboCount++;
+      arenaState.lastHitTime = frameCount;
+      arenaState.playerSpecialCharge = Math.min(100, arenaState.playerSpecialCharge + damage);
     } else {
-      arenaState.playerHealth -= damage;
       arenaState.playerDamage += damage;
-      defender.x += (defenderX > attackerX ? 1 : -1) * knockback;
-      defender.vy = -knockback * 0.5;
+      defender.x += kbX;
+      defender.vy = Math.min(defender.vy + kbY, -5);
+      arenaState.cpuSpecialCharge = Math.min(100, arenaState.cpuSpecialCharge + damage);
     }
     
-    spawnBurst(defenderX, defender.y + defender.h / 2, { color: "rgba(255,100,100,0.9)", count: 15 });
-    playSound("spike", { intensity: 1.5 });
+    // Hit effects
+    spawnBurst(defenderX, defenderY, { 
+      color: targetDamage > 100 ? "rgba(255,50,50,0.9)" : "rgba(255,200,100,0.9)", 
+      count: Math.min(30, 10 + targetDamage / 10),
+      speed: knockback * 0.3
+    });
+    
+    // Screen shake based on knockback
+    cameraShake = Math.min(15, knockback * 0.5);
+    
+    // Hit sound
+    playSound("spike", { intensity: Math.min(2, 0.5 + targetDamage / 100) });
+    
+    // Home run bat instant KO at high damage
+    if (weapon.homeRun && targetDamage > 80) {
+      arenaState.screenKO = isPlayer ? "cpu" : "player";
+      if (isPlayer) {
+        defender.x = 1200;
+      } else {
+        defender.x = -200;
+      }
+    }
+    
+    return true;
   }
+  return false;
+}
+
+function performSpecialMove(player, direction, isPlayer) {
+  const move = specialMoves.player[direction];
+  const charge = isPlayer ? arenaState.playerSpecialCharge : arenaState.cpuSpecialCharge;
+  
+  if (charge < move.charge) return false;
+  
+  if (isPlayer) {
+    arenaState.playerSpecialCharge -= move.charge;
+  } else {
+    arenaState.cpuSpecialCharge -= move.charge;
+  }
+  
+  const px = player.x + player.w / 2;
+  const py = player.y + player.h / 2;
+  
+  switch(direction) {
+    case "neutral":
+      // Energy ball projectile
+      arenaState.projectiles.push({
+        x: px,
+        y: py,
+        vx: isPlayer ? 8 : -8,
+        vy: 0,
+        damage: move.damage,
+        knockback: move.knockback,
+        owner: isPlayer ? "player" : "cpu",
+        color: isPlayer ? "#00BFFF" : "#FF4500",
+        size: 15,
+        life: 120
+      });
+      break;
+    case "side":
+      // Dash attack
+      player.x += isPlayer ? 100 : -100;
+      player.vx = isPlayer ? 15 : -15;
+      arenaAttack(player, isPlayer ? p2 : p1, { damage: move.damage, knockback: move.knockback, range: 80 }, isPlayer);
+      break;
+    case "up":
+      // Recovery move
+      player.vy = -18;
+      spawnBurst(px, py, { color: "#FFD700", count: 15 });
+      break;
+    case "down":
+      // Ground pound
+      if (!player.isGrounded || player.isGrounded()) {
+        player.vy = 20;
+        arenaState.groundPound = { owner: isPlayer ? "player" : "cpu", active: true };
+      }
+      break;
+  }
+  
+  spawnBurst(px, py, { color: isPlayer ? "#00BFFF" : "#FF4500", count: 20 });
+  playSound("spike", { intensity: 1.5 });
+  return true;
+}
+
+function updateProjectiles() {
+  for (let i = arenaState.projectiles.length - 1; i >= 0; i--) {
+    const proj = arenaState.projectiles[i];
+    proj.x += proj.vx;
+    proj.y += proj.vy;
+    proj.life--;
+    
+    if (proj.life <= 0 || proj.x < -50 || proj.x > 950 || proj.y < -50 || proj.y > 550) {
+      arenaState.projectiles.splice(i, 1);
+      continue;
+    }
+    
+    // Check collision with players
+    const target = proj.owner === "player" ? p2 : p1;
+    const dist = Math.hypot(proj.x - (target.x + target.w/2), proj.y - (target.y + target.h/2));
+    if (dist < proj.size + 20) {
+      arenaAttack(
+        { x: proj.x - 20, y: proj.y - 20, w: 40, h: 40 },
+        target,
+        { damage: proj.damage, knockback: proj.knockback, range: 50 },
+        proj.owner === "player"
+      );
+      arenaState.projectiles.splice(i, 1);
+    }
+  }
+}
+
+function checkPlatformCollision(player) {
+  if (!arenaState.active) return false;
+  if (player.vy < 0) return false; // Only when falling
+  
+  for (const plat of arenaState.platforms) {
+    if (player.x + player.w > plat.x && player.x < plat.x + plat.w) {
+      if (player.y + player.h >= plat.y && player.y + player.h <= plat.y + plat.h + 10) {
+        player.y = plat.y - player.h;
+        player.vy = 0;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function checkBlastZone(player, isPlayer) {
+  // Blast zones (KO boundaries) like Smash Bros
+  if (player.x < -150 || player.x > 1050 || player.y < -150 || player.y > 600) {
+    if (isPlayer) {
+      arenaState.playerStocks--;
+      arenaState.playerDamage = 0;
+      arenaState.respawnTimer = 120;
+      arenaState.screenKO = "player";
+      if (arenaState.playerStocks > 0) {
+        arenaState.announcer = "Player Down!";
+        setTimeout(() => arenaState.announcer = null, 1500);
+      }
+    } else {
+      arenaState.cpuStocks--;
+      arenaState.cpuDamage = 0;
+      arenaState.cpuRespawnTimer = 120;
+      arenaState.screenKO = "cpu";
+      playerStats.coins += 20;
+      if (arenaState.cpuStocks > 0) {
+        arenaState.announcer = "CPU Down!";
+        setTimeout(() => arenaState.announcer = null, 1500);
+      }
+    }
+    
+    // Respawn position
+    if (isPlayer && arenaState.playerStocks > 0) {
+      player.x = 200;
+      player.y = 100;
+      player.vx = 0;
+      player.vy = 0;
+      arenaState.playerInvincible = 180;
+    } else if (!isPlayer && arenaState.cpuStocks > 0) {
+      player.x = 700;
+      player.y = 100;
+      player.vx = 0;
+      player.vy = 0;
+      arenaState.cpuInvincible = 180;
+    }
+    
+    return true;
+  }
+  return false;
 }
 
 function updateArena() {
   if (!arenaState.active) return;
   
-  // Spawn weapons periodically
+  // Spawn weapons and items periodically
   if (frameCount % 180 === 0) spawnArenaWeapon();
+  if (frameCount % 300 === 0) spawnArenaItem();
   
-  // Cooldowns
+  // Cooldowns and timers
   if (arenaState.attackCooldown > 0) arenaState.attackCooldown--;
   if (arenaState.cpuAttackCooldown > 0) arenaState.cpuAttackCooldown--;
+  if (arenaState.playerInvincible > 0) arenaState.playerInvincible--;
+  if (arenaState.cpuInvincible > 0) arenaState.cpuInvincible--;
+  if (arenaState.respawnTimer > 0) arenaState.respawnTimer--;
+  if (arenaState.cpuRespawnTimer > 0) arenaState.cpuRespawnTimer--;
+  
+  // Reset combo if too much time passed
+  if (frameCount - arenaState.lastHitTime > 60) {
+    arenaState.comboCount = 0;
+  }
+  
+  // Platform collisions
+  checkPlatformCollision(p1);
+  checkPlatformCollision(p2);
+  
+  // Update projectiles
+  updateProjectiles();
   
   // Player pickup
   pickupWeapon(p1, true);
   
-  // CPU pickup and attack AI
+  // Smarter CPU AI
   pickupWeapon(p2, false);
-  if (arenaState.cpuWeapon && arenaState.cpuAttackCooldown <= 0) {
-    const dist = Math.abs((p2.x + p2.w/2) - (p1.x + p1.w/2));
-    if (dist < arenaState.cpuWeapon.range * 1.2) {
-      arenaAttack(p2, p1, arenaState.cpuWeapon, false);
-      arenaState.cpuAttackCooldown = arenaState.cpuWeapon.cooldown;
+  const cpuDist = Math.abs((p2.x + p2.w/2) - (p1.x + p1.w/2));
+  
+  // CPU tries to attack when in range
+  if (arenaState.cpuWeapon && arenaState.cpuAttackCooldown <= 0 && cpuDist < arenaState.cpuWeapon.range * 1.1) {
+    arenaAttack(p2, p1, arenaState.cpuWeapon, false);
+    arenaState.cpuAttackCooldown = arenaState.cpuWeapon.cooldown;
+  }
+  
+  // CPU uses special moves
+  if (arenaState.cpuSpecialCharge >= 30 && cpuDist < 150 && Math.random() < 0.02) {
+    performSpecialMove(p2, "neutral", false);
+  }
+  
+  // CPU recovery when off stage
+  if (p2.x < 50 || p2.x > 850 || p2.y > 450) {
+    if (arenaState.cpuSpecialCharge >= 30) {
+      performSpecialMove(p2, "up", false);
     }
   }
   
-  // Check for knockout (off screen or health depleted)
-  if (arenaState.playerHealth <= 0 || p1.x < -100 || p1.x > 1000) {
-    arenaState.cpuHealth = 100; // CPU wins
-    switchGameMode("volleyball");
+  // Check blast zones (KO)
+  checkBlastZone(p1, true);
+  checkBlastZone(p2, false);
+  
+  // Check for game end
+  if (arenaState.playerStocks <= 0) {
+    arenaState.announcer = "GAME! CPU Wins!";
+    setTimeout(() => {
+      switchGameMode("volleyball");
+    }, 3000);
   }
-  if (arenaState.cpuHealth <= 0 || p2.x < -100 || p2.x > 1000) {
-    playerStats.coins += 50; // Arena victory bonus
-    arenaState.playerHealth = 100;
-    switchGameMode("volleyball");
+  if (arenaState.cpuStocks <= 0) {
+    arenaState.announcer = "GAME! Player Wins!";
+    playerStats.coins += 100;
+    setTimeout(() => {
+      switchGameMode("volleyball");
+    }, 3000);
   }
 }
 
@@ -1968,44 +2292,179 @@ function drawArenaUI() {
   
   ctx.save();
   
-  // Player health
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.fillRect(20, 50, 200, 30);
-  ctx.fillStyle = "#0F0";
-  ctx.fillRect(22, 52, 196 * (arenaState.playerHealth / 100), 26);
-  ctx.fillStyle = "#FFF";
-  ctx.font = "14px Arial";
-  ctx.textAlign = "left";
-  ctx.fillText(`P1: ${Math.floor(arenaState.playerHealth)}%`, 30, 70);
-  ctx.fillText(`DMG: ${arenaState.playerDamage}%`, 130, 70);
+  // Draw platforms (Smash Bros style)
+  ctx.fillStyle = "rgba(100, 80, 60, 0.9)";
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 3;
+  for (const plat of arenaState.platforms) {
+    ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+    ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+  }
   
-  // CPU health
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.fillRect(680, 50, 200, 30);
-  ctx.fillStyle = "#F00";
-  ctx.fillRect(682, 52, 196 * (arenaState.cpuHealth / 100), 26);
-  ctx.fillStyle = "#FFF";
-  ctx.textAlign = "right";
-  ctx.fillText(`CPU: ${Math.floor(arenaState.cpuHealth)}%`, 870, 70);
-  ctx.fillText(`DMG: ${arenaState.cpuDamage}%`, 770, 70);
+  // Draw blast zone indicators (red borders)
+  ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+  ctx.lineWidth = 5;
+  ctx.setLineDash([10, 10]);
+  ctx.strokeRect(-140, -140, 1180, 730);
+  ctx.setLineDash([]);
   
-  // Weapons on ground
+  // Player damage display (Smash Bros style - big percentage)
+  // Player 1
+  ctx.fillStyle = "rgba(0, 100, 200, 0.8)";
+  ctx.fillRect(50, 430, 180, 60);
+  ctx.strokeStyle = "#00BFFF";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(50, 430, 180, 60);
+  
+  // Damage color changes based on percentage (green -> yellow -> orange -> red)
+  const p1DmgColor = arenaState.playerDamage < 50 ? "#00FF00" : 
+                     arenaState.playerDamage < 100 ? "#FFFF00" : 
+                     arenaState.playerDamage < 150 ? "#FFA500" : "#FF0000";
+  ctx.fillStyle = p1DmgColor;
+  ctx.font = "bold 36px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(`${Math.floor(arenaState.playerDamage)}%`, 140, 475);
+  
+  // Player 1 stocks
+  ctx.fillStyle = "#00BFFF";
+  for (let i = 0; i < arenaState.playerStocks; i++) {
+    ctx.beginPath();
+    ctx.arc(70 + i * 25, 445, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#FFF";
+  ctx.font = "12px Arial";
+  ctx.fillText("P1", 140, 425);
+  
+  // CPU
+  ctx.fillStyle = "rgba(200, 50, 50, 0.8)";
+  ctx.fillRect(670, 430, 180, 60);
+  ctx.strokeStyle = "#FF4500";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(670, 430, 180, 60);
+  
+  const cpuDmgColor = arenaState.cpuDamage < 50 ? "#00FF00" : 
+                      arenaState.cpuDamage < 100 ? "#FFFF00" : 
+                      arenaState.cpuDamage < 150 ? "#FFA500" : "#FF0000";
+  ctx.fillStyle = cpuDmgColor;
+  ctx.font = "bold 36px Arial";
+  ctx.fillText(`${Math.floor(arenaState.cpuDamage)}%`, 760, 475);
+  
+  // CPU stocks
+  ctx.fillStyle = "#FF4500";
+  for (let i = 0; i < arenaState.cpuStocks; i++) {
+    ctx.beginPath();
+    ctx.arc(690 + i * 25, 445, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#FFF";
+  ctx.font = "12px Arial";
+  ctx.fillText("CPU", 760, 425);
+  
+  // Special charge bars
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(50, 492, 180, 8);
+  ctx.fillRect(670, 492, 180, 8);
+  
+  ctx.fillStyle = "#FFD700";
+  ctx.fillRect(50, 492, 180 * (arenaState.playerSpecialCharge / 100), 8);
+  ctx.fillRect(670, 492, 180 * (arenaState.cpuSpecialCharge / 100), 8);
+  
+  // Weapons floating on ground with animation
   for (const weapon of arenaState.weapons) {
+    const floatY = Math.sin((frameCount + weapon.floatOffset) * 0.1) * 5;
     ctx.fillStyle = weapon.color;
-    ctx.fillRect(weapon.x - 10, weapon.y - 5, 20, 10);
+    ctx.strokeStyle = "#FFF";
+    ctx.lineWidth = 2;
+    
+    // Draw weapon icon based on type
+    ctx.beginPath();
+    ctx.arc(weapon.x, weapon.y + floatY, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
     ctx.fillStyle = "#FFF";
-    ctx.font = "10px Arial";
+    ctx.font = "bold 10px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(weapon.name, weapon.x, weapon.y - 10);
+    ctx.fillText(weapon.name.charAt(0), weapon.x, weapon.y + floatY + 4);
+    ctx.font = "9px Arial";
+    ctx.fillText(weapon.name, weapon.x, weapon.y + floatY - 20);
+  }
+  
+  // Items
+  for (const item of arenaState.items) {
+    const floatY = Math.sin(frameCount * 0.1) * 3;
+    ctx.fillStyle = item.color;
+    ctx.beginPath();
+    ctx.arc(item.x, item.y + floatY, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#FFF";
+    ctx.stroke();
+  }
+  
+  // Projectiles
+  for (const proj of arenaState.projectiles) {
+    ctx.fillStyle = proj.color;
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, proj.size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Trail effect
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(proj.x - proj.vx * 2, proj.y - proj.vy * 2, proj.size * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
   
   // Current weapon display
   if (arenaState.currentWeapon) {
-    ctx.fillStyle = "#FFF";
-    ctx.font = "12px Arial";
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(20, 90, 200, 50);
+    ctx.fillStyle = arenaState.currentWeapon.color;
+    ctx.font = "bold 14px Arial";
     ctx.textAlign = "left";
-    ctx.fillText(`Weapon: ${arenaState.currentWeapon.name}`, 20, 100);
-    ctx.fillText("Press Space to Attack", 20, 115);
+    ctx.fillText(`⚔️ ${arenaState.currentWeapon.name}`, 30, 110);
+    ctx.fillStyle = "#AAA";
+    ctx.font = "11px Arial";
+    ctx.fillText("Space: Attack | Z/X/C/V: Specials", 30, 130);
+  } else {
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(20, 90, 200, 30);
+    ctx.fillStyle = "#AAA";
+    ctx.font = "11px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText("Pick up a weapon! (walk over)", 30, 110);
+  }
+  
+  // Combo counter
+  if (arenaState.comboCount > 1) {
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 24px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(`${arenaState.comboCount} HIT COMBO!`, 450, 200);
+  }
+  
+  // Announcer text (READY FIGHT, KO, etc)
+  if (arenaState.announcer) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(200, 200, 500, 80);
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 40px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(arenaState.announcer, 450, 255);
+  }
+  
+  // Invincibility indicator
+  if (arenaState.playerInvincible > 0) {
+    ctx.strokeStyle = `rgba(255, 255, 0, ${0.5 + Math.sin(frameCount * 0.3) * 0.5})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(p1.x - 5, p1.y - 5, p1.w + 10, p1.h + 10);
+  }
+  if (arenaState.cpuInvincible > 0) {
+    ctx.strokeStyle = `rgba(255, 255, 0, ${0.5 + Math.sin(frameCount * 0.3) * 0.5})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(p2.x - 5, p2.y - 5, p2.w + 10, p2.h + 10);
   }
   
   ctx.restore();
@@ -2292,11 +2751,32 @@ document.addEventListener("keydown", e => {
       }
     }
     
-    // Arena attack
-    if (arenaState.active && (key === " " || key === "space") && arenaState.attackCooldown <= 0) {
-      if (arenaState.currentWeapon) {
-        arenaAttack(p1, p2, arenaState.currentWeapon, true);
-        arenaState.attackCooldown = arenaState.currentWeapon.cooldown;
+    // Arena attack and special moves
+    if (arenaState.active) {
+      // Basic attack with weapon
+      if ((key === " " || key === "space") && arenaState.attackCooldown <= 0) {
+        if (arenaState.currentWeapon) {
+          arenaAttack(p1, p2, arenaState.currentWeapon, true);
+          arenaState.attackCooldown = arenaState.currentWeapon.cooldown;
+        } else {
+          // Punch if no weapon (basic attack)
+          arenaAttack(p1, p2, { damage: 5, knockback: 5, range: 50 }, true);
+          arenaState.attackCooldown = 15;
+        }
+      }
+      
+      // Special moves (Z, X, C, V like Smash Bros controller)
+      if (key === "z") { // Neutral special
+        performSpecialMove(p1, "neutral", true);
+      }
+      if (key === "x") { // Side special
+        performSpecialMove(p1, "side", true);
+      }
+      if (key === "c") { // Up special (recovery)
+        performSpecialMove(p1, "up", true);
+      }
+      if (key === "v") { // Down special
+        performSpecialMove(p1, "down", true);
       }
     }
   }
