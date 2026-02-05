@@ -8,21 +8,120 @@
       background: radial-gradient(circle at 20% 20%, #8fd4ff 0%, #5aa7f5 35%, #245f9a 100%);
       font-family: 'Segoe UI', Arial, sans-serif;
     }
+    #game-container {
+      position: relative;
+      width: min(1200px, 96vw);
+      margin: 16px auto 28px auto;
+    }
     canvas {
       display: block;
-      margin: 16px auto 28px auto;
-      width: min(1200px, 96vw);
+      width: 100%;
       aspect-ratio: 9 / 5;
       height: auto;
       background: #0a1b2a;
       border-radius: 14px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05);
     }
+    #gui-buttons {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+    }
+    .gui-btn {
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      min-width: 100px;
+    }
+    .gui-btn:hover {
+      transform: scale(1.05);
+      border-color: rgba(255,255,255,0.8);
+    }
+    .gui-btn:active {
+      transform: scale(0.95);
+    }
+    #btn-shop { background: linear-gradient(135deg, #4CAF50, #2E7D32); color: white; }
+    #btn-casino { background: linear-gradient(135deg, #9C27B0, #6A1B9A); color: white; }
+    #btn-chemistry { background: linear-gradient(135deg, #00BCD4, #0097A7); color: white; }
+    #btn-caterpillar { background: linear-gradient(135deg, #8BC34A, #558B2F); color: white; }
+    #btn-arena { background: linear-gradient(135deg, #F44336, #C62828); color: white; }
+    #btn-simulation { background: linear-gradient(135deg, #FF9800, #E65100); color: white; }
+    #btn-feed { background: linear-gradient(135deg, #CDDC39, #9E9D24); color: #333; display: none; }
+    
+    #coins-display {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: linear-gradient(135deg, #FFD700, #FFA000);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      color: #333;
+      border: 2px solid rgba(255,255,255,0.5);
+      z-index: 100;
+    }
+    
+    #bottom-controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    .control-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #333, #555);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .control-btn:hover {
+      background: linear-gradient(135deg, #444, #666);
+      border-color: rgba(255,255,255,0.6);
+    }
+    #btn-3d { background: linear-gradient(135deg, #2196F3, #1565C0); color: white; }
+    #btn-3d.active { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
   </style>
 </head>
 <body>
 
-<canvas id="game" width="900" height="500"></canvas>
+<div id="game-container">
+  <canvas id="game" width="900" height="500"></canvas>
+  
+  <div id="coins-display">💰 Coins: <span id="coin-count">100</span></div>
+  
+  <div id="gui-buttons">
+    <button class="gui-btn" id="btn-3d" onclick="toggle3DBtn()">🎮 3D Mode</button>
+    <button class="gui-btn" id="btn-shop" onclick="toggleShop()">🛒 Shop</button>
+    <button class="gui-btn" id="btn-casino" onclick="toggleCasino()">🎰 Casino</button>
+    <button class="gui-btn" id="btn-chemistry" onclick="toggleChemistry()">⚗️ Chemistry</button>
+    <button class="gui-btn" id="btn-caterpillar" onclick="toggleCaterpillar()">🐛 Caterpillar</button>
+    <button class="gui-btn" id="btn-feed" onclick="feedCaterpillarBtn()">🍎 Feed</button>
+    <button class="gui-btn" id="btn-arena" onclick="switchToArena()">⚔️ Arena</button>
+    <button class="gui-btn" id="btn-simulation" onclick="switchToSim()">🌍 World Sim</button>
+  </div>
+  
+  <div id="bottom-controls">
+    <button class="control-btn" onclick="restartGame()">🔄 Restart</button>
+    <button class="control-btn" onclick="togglePause()">⏸️ Pause</button>
+  </div>
+</div>
 
 <script>
 // ================== Core Setup ==================
@@ -146,6 +245,1029 @@ const settings = {
   targetScore: 10,
   mapIndex: 0
 };
+
+// ================== Extended Game State ==================
+let gameMode = "volleyball"; // "volleyball", "arena", "simulation", "chemistry"
+let showingShop = false;
+let showingGambling = false;
+let showingChemistry = false;
+
+// Currency & Gambling System
+const playerStats = {
+  coins: 100,
+  totalWins: 0,
+  totalLosses: 0,
+  currentBet: 0,
+  slotSpinning: false,
+  slotResults: [0, 0, 0],
+  lastDiceRoll: 0
+};
+
+// Power-Up Shop System
+const shopItems = [
+  { id: "speedBoost", name: "Speed Boost", cost: 50, duration: 600, description: "+35% speed", active: false, timer: 0 },
+  { id: "jumpBoost", name: "Jump Boost", cost: 40, duration: 600, description: "+25% jump", active: false, timer: 0 },
+  { id: "staminaRegen", name: "Stamina Regen", cost: 30, duration: 900, description: "2x stamina regen", active: false, timer: 0 },
+  { id: "giantBall", name: "Giant Ball", cost: 60, duration: 450, description: "Ball is 50% bigger", active: false, timer: 0 },
+  { id: "slowCPU", name: "Slow CPU", cost: 75, duration: 600, description: "CPU 30% slower", active: false, timer: 0 },
+  { id: "autoReceive", name: "Auto Receive", cost: 100, duration: 300, description: "Auto-catch nearby balls", active: false, timer: 0 }
+];
+
+// Arena Battle System (Smash Bros Style)
+const arenaState = {
+  active: false,
+  playerHealth: 100,
+  cpuHealth: 100,
+  playerDamage: 0, // Knockback multiplier
+  cpuDamage: 0,
+  weapons: [],
+  currentWeapon: null,
+  cpuWeapon: null,
+  attackCooldown: 0,
+  cpuAttackCooldown: 0
+};
+
+const weaponTypes = [
+  { id: "sword", name: "Sword", damage: 15, knockback: 8, range: 60, cooldown: 30, color: "#silver" },
+  { id: "hammer", name: "Hammer", damage: 25, knockback: 15, range: 45, cooldown: 50, color: "#8B4513" },
+  { id: "bow", name: "Bow", damage: 10, knockback: 5, range: 200, cooldown: 40, color: "#DEB887", projectile: true },
+  { id: "bomb", name: "Bomb", damage: 30, knockback: 20, range: 80, cooldown: 90, color: "#333", explosive: true },
+  { id: "staff", name: "Magic Staff", damage: 18, knockback: 12, range: 150, cooldown: 35, color: "#9932CC", projectile: true }
+];
+
+// Life Simulation System (WorldBox Style)
+const simState = {
+  active: false,
+  entities: [],
+  maxEntities: 50,
+  selectedTool: "spawn",
+  spawnType: "human",
+  godPowers: {
+    lightning: { cost: 10, cooldown: 0 },
+    rain: { cost: 5, cooldown: 0 },
+    earthquake: { cost: 20, cooldown: 0 },
+    blessing: { cost: 15, cooldown: 0 },
+    plague: { cost: 25, cooldown: 0 }
+  },
+  divineEnergy: 100,
+  maxDivineEnergy: 100
+};
+
+const entityTypes = [
+  { id: "human", name: "Human", color: "#FFD700", speed: 1.5, health: 50, hostile: false },
+  { id: "warrior", name: "Warrior", color: "#DC143C", speed: 1.2, health: 80, hostile: true, damage: 10 },
+  { id: "farmer", name: "Farmer", color: "#32CD32", speed: 1.0, health: 40, hostile: false, produces: "food" },
+  { id: "mage", name: "Mage", color: "#9400D3", speed: 1.3, health: 35, hostile: false, magic: true },
+  { id: "animal", name: "Animal", color: "#8B4513", speed: 2.0, health: 30, hostile: false },
+  { id: "monster", name: "Monster", color: "#800000", speed: 1.8, health: 100, hostile: true, damage: 20 }
+];
+
+// Evil Caterpillar System
+const caterpillar = {
+  active: false,
+  x: 100,
+  y: groundY + 50,
+  segments: 5,
+  maxSegments: 20,
+  hunger: 50,
+  maxHunger: 100,
+  foodEaten: 0,
+  targetOpponent: false,
+  attackDamage: 5,
+  growthThreshold: 3, // Food needed to grow
+  lastFedFrame: 0
+};
+
+// Chemistry System
+const chemistryState = {
+  active: false,
+  elements: [],
+  combinations: [],
+  discovered: ["hydrogen", "oxygen", "carbon", "nitrogen"],
+  currentMix: [],
+  craftingResult: null
+};
+
+const baseElements = [
+  { id: "hydrogen", symbol: "H", color: "#E8E8E8", description: "Lightest element" },
+  { id: "oxygen", symbol: "O", color: "#FF6B6B", description: "Essential for life" },
+  { id: "carbon", symbol: "C", color: "#333333", description: "Building block of life" },
+  { id: "nitrogen", symbol: "N", color: "#87CEEB", description: "78% of air" },
+  { id: "iron", symbol: "Fe", color: "#B8860B", description: "Strong metal" },
+  { id: "uranium", symbol: "U", color: "#00FF00", description: "Radioactive" },
+  { id: "gold", symbol: "Au", color: "#FFD700", description: "Precious metal" },
+  { id: "silicon", symbol: "Si", color: "#A0A0A0", description: "Computer chips" }
+];
+
+const chemistryRecipes = [
+  { inputs: ["hydrogen", "hydrogen", "oxygen"], output: "water", name: "Water", color: "#00BFFF" },
+  { inputs: ["carbon", "oxygen", "oxygen"], output: "co2", name: "Carbon Dioxide", color: "#808080" },
+  { inputs: ["nitrogen", "nitrogen", "nitrogen"], output: "ammonia", name: "Ammonia", color: "#FFFF00" },
+  { inputs: ["uranium", "uranium", "uranium"], output: "nuke", name: "Nuclear Bomb", color: "#FF0000" },
+  { inputs: ["hydrogen", "hydrogen", "hydrogen", "hydrogen"], output: "star", name: "Star", color: "#FFFF00" },
+  { inputs: ["star", "star", "star"], output: "galaxy", name: "Galaxy", color: "#9932CC" },
+  { inputs: ["galaxy", "galaxy", "galaxy"], output: "universe", name: "Universe", color: "#000080" },
+  { inputs: ["water", "carbon", "nitrogen"], output: "life", name: "Life", color: "#00FF00" },
+  { inputs: ["iron", "carbon"], output: "steel", name: "Steel", color: "#708090" },
+  { inputs: ["silicon", "gold"], output: "computer", name: "Computer", color: "#00FFFF" }
+];
+
+// ================== Game Mode Functions ==================
+function switchGameMode(mode) {
+  gameMode = mode;
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+  
+  // Reset specific mode states
+  if (mode === "arena") {
+    arenaState.active = true;
+    arenaState.playerHealth = 100;
+    arenaState.cpuHealth = 100;
+    arenaState.playerDamage = 0;
+    arenaState.cpuDamage = 0;
+    spawnArenaWeapon();
+  } else {
+    arenaState.active = false;
+  }
+  
+  if (mode === "simulation") {
+    simState.active = true;
+    simState.entities = [];
+  } else {
+    simState.active = false;
+  }
+  
+  if (mode === "chemistry") {
+    chemistryState.active = true;
+    chemistryState.currentMix = [];
+    chemistryState.craftingResult = null;
+  } else {
+    chemistryState.active = false;
+  }
+}
+
+// ================== Gambling System Functions ==================
+function placeBet(amount) {
+  if (playerStats.coins >= amount) {
+    playerStats.currentBet = amount;
+    playerStats.coins -= amount;
+    return true;
+  }
+  return false;
+}
+
+function spinSlots() {
+  if (playerStats.slotSpinning) return;
+  if (!placeBet(10)) return;
+  
+  playerStats.slotSpinning = true;
+  const symbols = ["🍒", "🍋", "🍊", "💎", "7️⃣", "⭐"];
+  
+  setTimeout(() => {
+    playerStats.slotResults = [
+      Math.floor(Math.random() * symbols.length),
+      Math.floor(Math.random() * symbols.length),
+      Math.floor(Math.random() * symbols.length)
+    ];
+    
+    // Calculate winnings
+    const [a, b, c] = playerStats.slotResults;
+    let winnings = 0;
+    if (a === b && b === c) {
+      winnings = a === 4 ? 100 : (a === 3 ? 50 : 25); // 777 = 100, diamonds = 50, others = 25
+    } else if (a === b || b === c || a === c) {
+      winnings = 5;
+    }
+    
+    playerStats.coins += winnings;
+    playerStats.slotSpinning = false;
+    playerStats.currentBet = 0;
+  }, 1500);
+}
+
+function rollDice() {
+  if (!placeBet(5)) return 0;
+  const roll = Math.floor(Math.random() * 6) + 1 + Math.floor(Math.random() * 6) + 1;
+  playerStats.lastDiceRoll = roll;
+  
+  if (roll === 7 || roll === 11) {
+    playerStats.coins += 15;
+  } else if (roll === 2 || roll === 12) {
+    playerStats.coins += 25;
+  }
+  return roll;
+}
+
+function betOnMatch(amount) {
+  return placeBet(amount);
+}
+
+function collectMatchWinnings(won) {
+  if (won) {
+    playerStats.coins += playerStats.currentBet * 2;
+    playerStats.totalWins++;
+  } else {
+    playerStats.totalLosses++;
+  }
+  playerStats.currentBet = 0;
+}
+
+// ================== Power-Up Shop Functions ==================
+function buyPowerUp(itemId) {
+  const item = shopItems.find(i => i.id === itemId);
+  if (!item || playerStats.coins < item.cost || item.active) return false;
+  
+  playerStats.coins -= item.cost;
+  item.active = true;
+  item.timer = item.duration;
+  applyPowerUp(item);
+  return true;
+}
+
+function applyPowerUp(item) {
+  switch(item.id) {
+    case "speedBoost":
+      p1.speed = CONFIG.PLAYER_SPEED * 1.35;
+      break;
+    case "jumpBoost":
+      p1.jumpPower = CONFIG.PLAYER_JUMP_POWER * 1.25;
+      break;
+    case "slowCPU":
+      p2.speed = CONFIG.BOT_SPEED * 0.7;
+      break;
+  }
+}
+
+function removePowerUp(item) {
+  item.active = false;
+  switch(item.id) {
+    case "speedBoost":
+      p1.speed = CONFIG.PLAYER_SPEED;
+      break;
+    case "jumpBoost":
+      p1.jumpPower = CONFIG.PLAYER_JUMP_POWER;
+      break;
+    case "slowCPU":
+      p2.speed = CONFIG.BOT_SPEED;
+      break;
+  }
+}
+
+function updatePowerUps() {
+  for (const item of shopItems) {
+    if (item.active) {
+      item.timer--;
+      if (item.timer <= 0) {
+        removePowerUp(item);
+      }
+    }
+  }
+}
+
+// ================== Arena Battle Functions ==================
+function spawnArenaWeapon() {
+  if (arenaState.weapons.length < 3) {
+    const type = weaponTypes[Math.floor(Math.random() * weaponTypes.length)];
+    arenaState.weapons.push({
+      ...type,
+      x: 100 + Math.random() * 700,
+      y: groundY - 20,
+      spawned: frameCount
+    });
+  }
+}
+
+function pickupWeapon(player, isPlayer = true) {
+  for (let i = arenaState.weapons.length - 1; i >= 0; i--) {
+    const weapon = arenaState.weapons[i];
+    const px = player.x + player.w / 2;
+    const dist = Math.abs(px - weapon.x);
+    if (dist < 50 && player.y >= groundY - 20) {
+      if (isPlayer) {
+        arenaState.currentWeapon = weapon;
+      } else {
+        arenaState.cpuWeapon = weapon;
+      }
+      arenaState.weapons.splice(i, 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+function arenaAttack(attacker, defender, weapon, isPlayer) {
+  if (!weapon) return;
+  
+  const attackerX = attacker.x + attacker.w / 2;
+  const defenderX = defender.x + defender.w / 2;
+  const dist = Math.abs(attackerX - defenderX);
+  
+  if (dist <= weapon.range) {
+    const damage = weapon.damage;
+    const knockback = weapon.knockback * (1 + (isPlayer ? arenaState.cpuDamage : arenaState.playerDamage) / 100);
+    
+    if (isPlayer) {
+      arenaState.cpuHealth -= damage;
+      arenaState.cpuDamage += damage;
+      defender.x += (defenderX > attackerX ? 1 : -1) * knockback;
+      defender.vy = -knockback * 0.5;
+    } else {
+      arenaState.playerHealth -= damage;
+      arenaState.playerDamage += damage;
+      defender.x += (defenderX > attackerX ? 1 : -1) * knockback;
+      defender.vy = -knockback * 0.5;
+    }
+    
+    spawnBurst(defenderX, defender.y + defender.h / 2, { color: "rgba(255,100,100,0.9)", count: 15 });
+    playSound("spike", { intensity: 1.5 });
+  }
+}
+
+function updateArena() {
+  if (!arenaState.active) return;
+  
+  // Spawn weapons periodically
+  if (frameCount % 180 === 0) spawnArenaWeapon();
+  
+  // Cooldowns
+  if (arenaState.attackCooldown > 0) arenaState.attackCooldown--;
+  if (arenaState.cpuAttackCooldown > 0) arenaState.cpuAttackCooldown--;
+  
+  // Player pickup
+  pickupWeapon(p1, true);
+  
+  // CPU pickup and attack AI
+  pickupWeapon(p2, false);
+  if (arenaState.cpuWeapon && arenaState.cpuAttackCooldown <= 0) {
+    const dist = Math.abs((p2.x + p2.w/2) - (p1.x + p1.w/2));
+    if (dist < arenaState.cpuWeapon.range * 1.2) {
+      arenaAttack(p2, p1, arenaState.cpuWeapon, false);
+      arenaState.cpuAttackCooldown = arenaState.cpuWeapon.cooldown;
+    }
+  }
+  
+  // Check for knockout (off screen or health depleted)
+  if (arenaState.playerHealth <= 0 || p1.x < -100 || p1.x > 1000) {
+    arenaState.cpuHealth = 100; // CPU wins
+    switchGameMode("volleyball");
+  }
+  if (arenaState.cpuHealth <= 0 || p2.x < -100 || p2.x > 1000) {
+    playerStats.coins += 50; // Arena victory bonus
+    arenaState.playerHealth = 100;
+    switchGameMode("volleyball");
+  }
+}
+
+// ================== Life Simulation Functions ==================
+function spawnEntity(type, x, y) {
+  if (simState.entities.length >= simState.maxEntities) return;
+  
+  const entityType = entityTypes.find(e => e.id === type);
+  if (!entityType) return;
+  
+  simState.entities.push({
+    ...entityType,
+    x: x || Math.random() * 800 + 50,
+    y: y || groundY,
+    vx: (Math.random() - 0.5) * 2,
+    vy: 0,
+    currentHealth: entityType.health,
+    age: 0,
+    target: null
+  });
+}
+
+function updateSimulation() {
+  if (!simState.active) return;
+  
+  // Regenerate divine energy
+  simState.divineEnergy = Math.min(simState.maxDivineEnergy, simState.divineEnergy + 0.05);
+  
+  // Update entities
+  for (let i = simState.entities.length - 1; i >= 0; i--) {
+    const entity = simState.entities[i];
+    entity.age++;
+    
+    // Movement
+    entity.x += entity.vx * entity.speed;
+    entity.vy += 0.3;
+    entity.y += entity.vy;
+    
+    // Ground collision
+    if (entity.y > groundY) {
+      entity.y = groundY;
+      entity.vy = 0;
+    }
+    
+    // Boundary wrap
+    if (entity.x < 0) entity.x = 900;
+    if (entity.x > 900) entity.x = 0;
+    
+    // Random direction change
+    if (Math.random() < 0.02) {
+      entity.vx = (Math.random() - 0.5) * 2;
+    }
+    
+    // Hostile behavior
+    if (entity.hostile && entity.damage) {
+      for (const other of simState.entities) {
+        if (other !== entity && !other.hostile) {
+          const dist = Math.hypot(entity.x - other.x, entity.y - other.y);
+          if (dist < 30) {
+            other.currentHealth -= entity.damage * 0.1;
+            if (other.currentHealth <= 0) {
+              simState.entities.splice(simState.entities.indexOf(other), 1);
+            }
+          }
+        }
+      }
+    }
+    
+    // Death from old age
+    if (entity.age > 3600) { // 1 minute at 60fps
+      simState.entities.splice(i, 1);
+    }
+  }
+}
+
+function useGodPower(power) {
+  const godPower = simState.godPowers[power];
+  if (!godPower || simState.divineEnergy < godPower.cost || godPower.cooldown > 0) return;
+  
+  simState.divineEnergy -= godPower.cost;
+  godPower.cooldown = 120;
+  
+  switch(power) {
+    case "lightning":
+      // Strike random entity
+      if (simState.entities.length > 0) {
+        const target = simState.entities[Math.floor(Math.random() * simState.entities.length)];
+        target.currentHealth -= 50;
+        spawnBurst(target.x, target.y, { color: "rgba(255,255,0,0.9)", count: 20 });
+        if (target.currentHealth <= 0) {
+          simState.entities.splice(simState.entities.indexOf(target), 1);
+        }
+      }
+      break;
+    case "blessing":
+      // Heal all friendly entities
+      for (const entity of simState.entities) {
+        if (!entity.hostile) {
+          entity.currentHealth = Math.min(entity.health, entity.currentHealth + 20);
+        }
+      }
+      break;
+    case "plague":
+      // Damage all hostile entities
+      for (const entity of simState.entities) {
+        if (entity.hostile) {
+          entity.currentHealth -= 30;
+          if (entity.currentHealth <= 0) {
+            simState.entities.splice(simState.entities.indexOf(entity), 1);
+          }
+        }
+      }
+      break;
+    case "earthquake":
+      // Damage everything
+      for (let i = simState.entities.length - 1; i >= 0; i--) {
+        simState.entities[i].currentHealth -= 15;
+        simState.entities[i].vy = -8;
+        if (simState.entities[i].currentHealth <= 0) {
+          simState.entities.splice(i, 1);
+        }
+      }
+      cameraShake = 20;
+      break;
+  }
+}
+
+// ================== Evil Caterpillar Functions ==================
+function updateCaterpillar() {
+  if (!caterpillar.active) return;
+  
+  // Hunger decreases over time
+  caterpillar.hunger = Math.max(0, caterpillar.hunger - 0.02);
+  
+  // Move towards opponent if fed enough
+  if (caterpillar.targetOpponent && caterpillar.segments >= 10) {
+    const targetX = p2.x + p2.w / 2;
+    const dx = targetX - caterpillar.x;
+    caterpillar.x += Math.sign(dx) * Math.min(2, Math.abs(dx) * 0.02);
+    
+    // Attack opponent if close
+    if (Math.abs(dx) < 50) {
+      if (frameCount % 30 === 0) {
+        // In arena mode, damage health; in volleyball, give player a point
+        if (arenaState.active) {
+          arenaState.cpuHealth -= caterpillar.attackDamage;
+        } else if (gameMode === "volleyball") {
+          // Give player a point as caterpillar "eats" opponent's ability
+          p1.score = Math.min(settings.targetScore, p1.score + 0.1);
+        }
+        spawnBurst(p2.x + p2.w/2, p2.y + p2.h/2, { color: "rgba(100,255,100,0.9)", count: 8 });
+      }
+    }
+  }
+  
+  // Shrink if starving
+  if (caterpillar.hunger <= 0 && frameCount % 300 === 0) {
+    caterpillar.segments = Math.max(3, caterpillar.segments - 1);
+  }
+}
+
+function feedCaterpillar(food = 1) {
+  if (!caterpillar.active) return;
+  
+  caterpillar.hunger = Math.min(caterpillar.maxHunger, caterpillar.hunger + 20 * food);
+  caterpillar.foodEaten += food;
+  caterpillar.lastFedFrame = frameCount;
+  
+  // Grow if fed enough
+  if (caterpillar.foodEaten >= caterpillar.growthThreshold) {
+    caterpillar.segments = Math.min(caterpillar.maxSegments, caterpillar.segments + 1);
+    caterpillar.foodEaten = 0;
+    caterpillar.attackDamage += 2;
+  }
+  
+  // Start targeting opponent once big enough
+  if (caterpillar.segments >= 10) {
+    caterpillar.targetOpponent = true;
+  }
+  
+  playerStats.coins += 5; // Reward for feeding
+}
+
+function drawCaterpillar() {
+  if (!caterpillar.active) return;
+  
+  ctx.save();
+  const segmentSize = 12 + caterpillar.segments * 0.5;
+  
+  // Draw segments
+  for (let i = 0; i < caterpillar.segments; i++) {
+    const x = caterpillar.x - i * segmentSize * 0.8;
+    const y = caterpillar.y + Math.sin(frameCount * 0.1 + i * 0.5) * 3;
+    
+    // Body segment
+    ctx.fillStyle = i === 0 ? "#4a1" : "#3a2";
+    ctx.beginPath();
+    ctx.arc(x, y, segmentSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Spots
+    ctx.fillStyle = "#2a1";
+    ctx.beginPath();
+    ctx.arc(x + 2, y - 2, segmentSize / 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Head with eyes
+  const headX = caterpillar.x;
+  const headY = caterpillar.y;
+  
+  // Evil eyes
+  ctx.fillStyle = "#ff0";
+  ctx.beginPath();
+  ctx.arc(headX + 4, headY - 4, 3, 0, Math.PI * 2);
+  ctx.arc(headX - 4, headY - 4, 3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = "#f00";
+  ctx.beginPath();
+  ctx.arc(headX + 4, headY - 4, 1.5, 0, Math.PI * 2);
+  ctx.arc(headX - 4, headY - 4, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Antennae
+  ctx.strokeStyle = "#3a2";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(headX - 3, headY - segmentSize/2);
+  ctx.lineTo(headX - 8, headY - segmentSize);
+  ctx.moveTo(headX + 3, headY - segmentSize/2);
+  ctx.lineTo(headX + 8, headY - segmentSize);
+  ctx.stroke();
+  
+  // Hunger bar
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(caterpillar.x - 20, caterpillar.y - 30, 40, 6);
+  ctx.fillStyle = caterpillar.hunger > 30 ? "#0f0" : "#f00";
+  ctx.fillRect(caterpillar.x - 20, caterpillar.y - 30, 40 * (caterpillar.hunger / caterpillar.maxHunger), 6);
+  
+  ctx.restore();
+}
+
+// ================== Chemistry System Functions ==================
+function addElementToMix(elementId) {
+  if (chemistryState.currentMix.length >= 4) return;
+  
+  const element = baseElements.find(e => e.id === elementId);
+  if (element && chemistryState.discovered.includes(elementId)) {
+    chemistryState.currentMix.push(elementId);
+  }
+}
+
+function clearMix() {
+  chemistryState.currentMix = [];
+  chemistryState.craftingResult = null;
+}
+
+function tryCraft() {
+  if (chemistryState.currentMix.length < 2) return null;
+  
+  // Sort for comparison
+  const sorted = [...chemistryState.currentMix].sort();
+  
+  for (const recipe of chemistryRecipes) {
+    const recipeSorted = [...recipe.inputs].sort();
+    if (sorted.length === recipeSorted.length && 
+        sorted.every((val, idx) => val === recipeSorted[idx])) {
+      // Found a match!
+      chemistryState.craftingResult = recipe;
+      
+      // Unlock the new element/compound
+      if (!chemistryState.discovered.includes(recipe.output)) {
+        chemistryState.discovered.push(recipe.output);
+        playerStats.coins += 25; // Discovery bonus
+        
+        // Special effects for major discoveries
+        if (recipe.output === "nuke") {
+          cameraShake = 50;
+          spawnBurst(450, 250, { color: "rgba(255,200,100,0.9)", count: 50, spread: 3, speed: 8 });
+        } else if (recipe.output === "universe") {
+          cameraShake = 30;
+          spawnBurst(450, 250, { color: "rgba(100,100,255,0.9)", count: 100, spread: 3.14, speed: 10 });
+          playerStats.coins += 500; // Massive bonus for creating the universe
+        } else if (recipe.output === "life") {
+          spawnBurst(450, 250, { color: "rgba(100,255,100,0.9)", count: 30, spread: 2, speed: 5 });
+          // Spawn entities in simulation
+          if (simState.active) {
+            for (let i = 0; i < 5; i++) spawnEntity("human");
+          }
+        }
+      }
+      
+      chemistryState.currentMix = [];
+      return recipe;
+    }
+  }
+  
+  // No match - failed combination
+  chemistryState.currentMix = [];
+  return null;
+}
+
+// ================== Extended Drawing Functions ==================
+function drawShop() {
+  if (!showingShop) return;
+  
+  ctx.save();
+  // Background overlay
+  ctx.fillStyle = "rgba(0,0,0,0.8)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Shop panel
+  ctx.fillStyle = "rgba(50,50,80,0.95)";
+  ctx.fillRect(150, 50, 600, 400);
+  ctx.strokeStyle = "#gold";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(150, 50, 600, 400);
+  
+  // Title
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 28px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("⚡ POWER-UP SHOP ⚡", 450, 90);
+  
+  // Coins display
+  ctx.fillStyle = "#FFF";
+  ctx.font = "18px Arial";
+  ctx.fillText(`💰 Coins: ${playerStats.coins}`, 450, 120);
+  
+  // Items
+  let y = 160;
+  for (let i = 0; i < shopItems.length; i++) {
+    const item = shopItems[i];
+    const canAfford = playerStats.coins >= item.cost && !item.active;
+    
+    ctx.fillStyle = canAfford ? "rgba(100,150,100,0.8)" : "rgba(80,80,80,0.8)";
+    if (item.active) ctx.fillStyle = "rgba(100,100,200,0.8)";
+    ctx.fillRect(170, y, 560, 50);
+    
+    ctx.fillStyle = "#FFF";
+    ctx.font = "16px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(`${i+1}. ${item.name}`, 180, y + 20);
+    ctx.fillText(item.description, 180, y + 40);
+    
+    ctx.textAlign = "right";
+    if (item.active) {
+      ctx.fillStyle = "#0F0";
+      ctx.fillText(`ACTIVE (${Math.ceil(item.timer/60)}s)`, 720, y + 30);
+    } else {
+      ctx.fillStyle = canAfford ? "#FFD700" : "#888";
+      ctx.fillText(`${item.cost} coins`, 720, y + 30);
+    }
+    
+    y += 55;
+  }
+  
+  ctx.fillStyle = "#AAA";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Press 1-6 to buy | Press B to close shop", 450, 440);
+  
+  ctx.restore();
+}
+
+function drawGambling() {
+  if (!showingGambling) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Casino panel
+  ctx.fillStyle = "rgba(80,20,20,0.95)";
+  ctx.fillRect(150, 50, 600, 400);
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(150, 50, 600, 400);
+  
+  // Title
+  ctx.fillStyle = "#FFD700";
+  ctx.font = "bold 32px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🎰 CASINO 🎰", 450, 95);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "20px Arial";
+  ctx.fillText(`💰 Coins: ${playerStats.coins}`, 450, 130);
+  
+  // Slot machine
+  ctx.fillStyle = "rgba(40,40,60,0.9)";
+  ctx.fillRect(250, 150, 400, 100);
+  
+  const symbols = ["🍒", "🍋", "🍊", "💎", "7️⃣", "⭐"];
+  ctx.font = "48px Arial";
+  for (let i = 0; i < 3; i++) {
+    const symbol = playerStats.slotSpinning ? 
+      symbols[Math.floor(Math.random() * symbols.length)] : 
+      symbols[playerStats.slotResults[i]];
+    ctx.fillText(symbol, 320 + i * 120, 215);
+  }
+  
+  // Instructions
+  ctx.fillStyle = "#FFF";
+  ctx.font = "16px Arial";
+  ctx.fillText("Press S to Spin Slots (10 coins)", 450, 280);
+  ctx.fillText("Press D to Roll Dice (5 coins)", 450, 305);
+  ctx.fillText("Press V to Bet on Next Match (20 coins)", 450, 330);
+  
+  if (playerStats.lastDiceRoll > 0) {
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText(`Last Dice Roll: ${playerStats.lastDiceRoll}`, 450, 360);
+  }
+  
+  if (playerStats.currentBet > 0) {
+    ctx.fillStyle = "#0F0";
+    ctx.fillText(`Current Match Bet: ${playerStats.currentBet} coins`, 450, 385);
+  }
+  
+  ctx.fillStyle = "#AAA";
+  ctx.font = "14px Arial";
+  ctx.fillText("Press G to close casino", 450, 430);
+  
+  ctx.restore();
+}
+
+function drawChemistry() {
+  if (!showingChemistry) return;
+  
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Chemistry lab panel
+  ctx.fillStyle = "rgba(20,40,60,0.95)";
+  ctx.fillRect(100, 30, 700, 440);
+  ctx.strokeStyle = "#00FFFF";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(100, 30, 700, 440);
+  
+  // Title
+  ctx.fillStyle = "#00FFFF";
+  ctx.font = "bold 28px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("⚗️ CHEMISTRY LAB ⚗️", 450, 65);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.fillText(`Discovered: ${chemistryState.discovered.length}/${baseElements.length + chemistryRecipes.length}`, 450, 90);
+  
+  // Elements grid
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.fillText("Elements (Press number to add):", 250, 115);
+  
+  let x = 120, y = 130;
+  for (let i = 0; i < baseElements.length; i++) {
+    const elem = baseElements[i];
+    const unlocked = chemistryState.discovered.includes(elem.id);
+    
+    ctx.fillStyle = unlocked ? elem.color : "#333";
+    ctx.fillRect(x, y, 60, 60);
+    ctx.strokeStyle = unlocked ? "#FFF" : "#555";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 60, 60);
+    
+    ctx.fillStyle = unlocked ? "#FFF" : "#555";
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(elem.symbol, x + 30, y + 30);
+    ctx.font = "10px Arial";
+    ctx.fillText(`[${i + 1}]`, x + 30, y + 50);
+    
+    x += 70;
+    if (x > 750) { x = 120; y += 70; }
+  }
+  
+  // Mixing area
+  ctx.fillStyle = "rgba(60,60,80,0.8)";
+  ctx.fillRect(120, 280, 300, 80);
+  ctx.strokeStyle = "#88F";
+  ctx.strokeRect(120, 280, 300, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Mixing:", 130, 300);
+  
+  // Show current mix
+  let mixX = 130;
+  for (const elemId of chemistryState.currentMix) {
+    const elem = baseElements.find(e => e.id === elemId);
+    if (elem) {
+      ctx.fillStyle = elem.color;
+      ctx.beginPath();
+      ctx.arc(mixX + 15, 335, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFF";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(elem.symbol, mixX + 15, 340);
+      mixX += 40;
+    }
+  }
+  
+  // Result area
+  ctx.fillStyle = "rgba(60,80,60,0.8)";
+  ctx.fillRect(450, 280, 330, 80);
+  ctx.strokeStyle = "#8F8";
+  ctx.strokeRect(450, 280, 330, 80);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Result:", 460, 300);
+  
+  if (chemistryState.craftingResult) {
+    ctx.fillStyle = chemistryState.craftingResult.color;
+    ctx.font = "bold 18px Arial";
+    ctx.fillText(chemistryState.craftingResult.name, 460, 335);
+    ctx.fillStyle = "#0F0";
+    ctx.font = "12px Arial";
+    ctx.fillText("SUCCESS! +25 coins", 460, 355);
+  }
+  
+  // Discovered compounds
+  ctx.fillStyle = "#AAA";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Discovered compounds:", 450, 385);
+  
+  let compX = 150;
+  for (const recipe of chemistryRecipes) {
+    if (chemistryState.discovered.includes(recipe.output)) {
+      ctx.fillStyle = recipe.color;
+      ctx.font = "10px Arial";
+      ctx.fillText(recipe.name, compX, 410);
+      compX += 80;
+      if (compX > 750) break;
+    }
+  }
+  
+  // Instructions
+  ctx.fillStyle = "#AAA";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Enter to Craft | Backspace to Clear | C to close lab", 450, 455);
+  
+  ctx.restore();
+}
+
+function drawSimulation() {
+  if (!simState.active) return;
+  
+  // Draw entities
+  for (const entity of simState.entities) {
+    ctx.save();
+    ctx.fillStyle = entity.color;
+    ctx.beginPath();
+    ctx.arc(entity.x, entity.y - 10, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Health bar
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(entity.x - 10, entity.y - 25, 20, 4);
+    ctx.fillStyle = entity.currentHealth > entity.health * 0.3 ? "#0F0" : "#F00";
+    ctx.fillRect(entity.x - 10, entity.y - 25, 20 * (entity.currentHealth / entity.health), 4);
+    
+    ctx.restore();
+  }
+  
+  // Draw UI
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(5, 80, 150, 120);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText(`Entities: ${simState.entities.length}/${simState.maxEntities}`, 10, 95);
+  ctx.fillText(`Divine Energy: ${Math.floor(simState.divineEnergy)}`, 10, 115);
+  
+  ctx.fillStyle = "#AAA";
+  ctx.font = "10px Arial";
+  ctx.fillText("Z-Spawn | X-Lightning", 10, 135);
+  ctx.fillText("N-Blessing | M-Plague", 10, 150);
+  ctx.fillText(",-Earthquake", 10, 165);
+  ctx.fillText("I-Toggle Simulation", 10, 180);
+  
+  ctx.restore();
+}
+
+function drawArenaUI() {
+  if (!arenaState.active) return;
+  
+  ctx.save();
+  
+  // Player health
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(20, 50, 200, 30);
+  ctx.fillStyle = "#0F0";
+  ctx.fillRect(22, 52, 196 * (arenaState.playerHealth / 100), 26);
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText(`P1: ${Math.floor(arenaState.playerHealth)}%`, 30, 70);
+  ctx.fillText(`DMG: ${arenaState.playerDamage}%`, 130, 70);
+  
+  // CPU health
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(680, 50, 200, 30);
+  ctx.fillStyle = "#F00";
+  ctx.fillRect(682, 52, 196 * (arenaState.cpuHealth / 100), 26);
+  ctx.fillStyle = "#FFF";
+  ctx.textAlign = "right";
+  ctx.fillText(`CPU: ${Math.floor(arenaState.cpuHealth)}%`, 870, 70);
+  ctx.fillText(`DMG: ${arenaState.cpuDamage}%`, 770, 70);
+  
+  // Weapons on ground
+  for (const weapon of arenaState.weapons) {
+    ctx.fillStyle = weapon.color;
+    ctx.fillRect(weapon.x - 10, weapon.y - 5, 20, 10);
+    ctx.fillStyle = "#FFF";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(weapon.name, weapon.x, weapon.y - 10);
+  }
+  
+  // Current weapon display
+  if (arenaState.currentWeapon) {
+    ctx.fillStyle = "#FFF";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(`Weapon: ${arenaState.currentWeapon.name}`, 20, 100);
+    ctx.fillText("Press Space to Attack", 20, 115);
+  }
+  
+  ctx.restore();
+}
+
+function drawModeSelector() {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(300, 5, 300, 20);
+  
+  ctx.fillStyle = "#FFF";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(`Mode: ${gameMode.toUpperCase()} | T-Toggle | B-Shop | G-Casino | C-Chem | K-Caterpillar`, 450, 18);
+  ctx.restore();
+}
 
 const maps = [
   {
@@ -287,6 +1409,102 @@ document.addEventListener("keydown", e => {
     keys["shift"] = true; // tracked but unused
     return;
   }
+  
+  // Extended game controls (when not paused)
+  if (!paused) {
+    // Toggle Shop
+    if (key === "b") {
+      showingShop = !showingShop;
+      showingGambling = false;
+      showingChemistry = false;
+      return;
+    }
+    
+    // Toggle Gambling/Casino
+    if (key === "g" && !showingShop && !showingChemistry) {
+      showingGambling = !showingGambling;
+      return;
+    }
+    
+    // Toggle Chemistry Lab
+    if (key === "c" && !showingShop && !showingGambling) {
+      showingChemistry = !showingChemistry;
+      return;
+    }
+    
+    // Toggle Caterpillar
+    if (key === "k") {
+      caterpillar.active = !caterpillar.active;
+      if (caterpillar.active) {
+        caterpillar.x = 100;
+        caterpillar.hunger = 50;
+      }
+      return;
+    }
+    
+    // Feed Caterpillar
+    if (key === "l" && caterpillar.active) {
+      feedCaterpillar();
+      return;
+    }
+    
+    // Toggle game modes
+    if (key === "t") {
+      const modes = ["volleyball", "arena", "simulation"];
+      const idx = modes.indexOf(gameMode);
+      switchGameMode(modes[(idx + 1) % modes.length]);
+      return;
+    }
+    
+    // Shop purchases (1-6)
+    if (showingShop) {
+      const num = parseInt(key);
+      if (num >= 1 && num <= 6) {
+        buyPowerUp(shopItems[num - 1].id);
+        return;
+      }
+    }
+    
+    // Gambling controls
+    if (showingGambling) {
+      if (key === "s") { spinSlots(); return; }
+      if (key === "d") { rollDice(); return; }
+      if (key === "v") { betOnMatch(20); return; }
+    }
+    
+    // Chemistry controls
+    if (showingChemistry) {
+      const num = parseInt(key);
+      if (num >= 1 && num <= 8) {
+        addElementToMix(baseElements[num - 1].id);
+        return;
+      }
+      if (key === "enter") { tryCraft(); return; }
+      if (key === "backspace") { clearMix(); return; }
+    }
+    
+    // Simulation controls
+    if (simState.active) {
+      if (key === "z") { spawnEntity(simState.spawnType); return; }
+      if (key === "x") { useGodPower("lightning"); return; }
+      if (key === "n") { useGodPower("blessing"); return; }
+      if (key === ",") { useGodPower("earthquake"); return; }
+      if (key === "i") { 
+        simState.active = false;
+        switchGameMode("volleyball");
+        return;
+      }
+    }
+    
+    // Arena attack
+    if (arenaState.active && (key === " " || key === "space") && arenaState.attackCooldown <= 0) {
+      if (arenaState.currentWeapon) {
+        arenaAttack(p1, p2, arenaState.currentWeapon, true);
+        arenaState.attackCooldown = arenaState.currentWeapon.cooldown;
+      }
+    }
+  }
+  
   keys[key] = true;
 });
 document.addEventListener("keyup", e => {
@@ -612,7 +1830,7 @@ class Player {
           this.lastHitFrame["dive"] = frameCount;
         }
 
-        // Jump (W or Space) – still only when grounded and not diving
+        // Jump (Arrow Up or Space) – still only when grounded and not diving
         const jumpPressed = keys[jumpKey] || keys[" "];
         if (jumpPressed && this.isGrounded() && this.diveTimer <= 0 && this.postDiveStun <= 0) {
           this.vy = -this.jumpPower * jumpMod;
@@ -679,6 +1897,13 @@ class Player {
   }
 
   draw() {
+    // Use 3D renderer if enabled
+    if (renderer3D.enabled) {
+      draw3DCharacter(this);
+      ctx.restore();
+      return;
+    }
+    
     ctx.save();
 
     // Ground shadow
@@ -1869,6 +3094,14 @@ this.hitUsed = {
 
   }
   draw() {
+    // Use 3D renderer if enabled
+    if (renderer3D.enabled) {
+      // Draw 3D ball with size modifier from power-ups
+      const sizeMultiplier = shopItems.find(i => i.id === "giantBall")?.active ? 1.5 : 1;
+      draw3DSphere(this.x, this.y, 20, this.r * sizeMultiplier, '#eaf1ff');
+      return;
+    }
+    
     ctx.save();
     // soft ground shadow
     const shadowScale = Math.max(0.35, Math.min(1, 1 - (this.y - 80) / 320));
@@ -1962,6 +3195,17 @@ applyBotDifficulty();
 const ball = new Ball();
 
 function drawNet() {
+  // Use 3D renderer if enabled
+  if (renderer3D.enabled) {
+    // 3D Net posts
+    draw3DCylinder(443, 250, 15, 4, 190, '#0e2845');
+    draw3DCylinder(453, 250, 15, 4, 190, '#0e2845');
+    
+    // 3D Net body
+    draw3DBox(445, 260, 10, 10, 170, 8, '#ffffff');
+    return;
+  }
+  
   ctx.save();
   // Posts
   ctx.shadowColor = "rgba(0,0,0,0.25)";
@@ -2130,8 +3374,8 @@ function drawKeybinds() {
   const y = 520 - 42; // align with stamina bar
   const x = staminaX + staminaWidth + 20;
 
-  const text = "W/A/D move & jump | Q spike | E set | S receive / feint (air) | F dive | Shift sprint | P/Esc pause | M mute";
-  ctx.font = "12px 'Segoe UI', Arial";
+  const text = "Arrows move | Q spike | E set | S receive | B shop | G casino | C chem | K caterpillar | T mode";
+  ctx.font = "11px 'Segoe UI', Arial";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
 
@@ -2299,6 +3543,12 @@ function drawBackground() {
   drawSand(map);
   drawSandTexture();
   drawCourtLines();
+  
+  // Add 3D ground grid when 3D mode is enabled
+  if (renderer3D.enabled) {
+    draw3DGround();
+  }
+  
   drawVignette(map);
 }
 
@@ -2792,11 +4042,11 @@ function gameLoop(now) {
 
     if (!gameOver) {
       // Updates
-      p1.update("a", "d", "w");
+      p1.update("arrowleft", "arrowright", "arrowup");
       // bot update is inside botLogic
       ball.update();
 
-      // Player 1 controls:
+      // Player 1 controls (Arrow Keys to move):
       // q = spike, e = set, s = receive (ground = high bump, air = softer)
       if (keys["e"]) ball.interact(p1, "set");
       if (keys["q"]) ball.interact(p1, "spike");
@@ -2829,7 +4079,17 @@ function gameLoop(now) {
       // Game over condition
       if (p1.score >= settings.targetScore || p2.score >= settings.targetScore) {
         gameOver = true;
+        // Handle gambling winnings
+        if (playerStats.currentBet > 0) {
+          collectMatchWinnings(p1.score >= settings.targetScore);
+        }
       }
+      
+      // Update extended systems
+      updatePowerUps();
+      updateArena();
+      updateSimulation();
+      updateCaterpillar();
     }
 
     updateFX();
@@ -2853,15 +4113,423 @@ function gameLoop(now) {
   drawSuperCharge(p1);
   drawSuperCharge(p2);
   drawKeybinds();
+  
+  // Draw extended game systems
+  drawModeSelector();
+  drawArenaUI();
+  drawSimulation();
+  drawCaterpillar();
+  
+  // Draw overlay UIs (last so they appear on top)
+  drawShop();
+  drawGambling();
+  drawChemistry();
 
   if (gameOver) {
     drawGameOver();
   } else if (paused) {
     drawPauseOverlay();
   }
+  
+  // Update GUI elements
+  updateGUI();
 
   requestAnimationFrame(gameLoop);
 }
+
+// ================== GUI Button Functions ==================
+function toggleShop() {
+  showingShop = !showingShop;
+  showingGambling = false;
+  showingChemistry = false;
+}
+
+function toggleCasino() {
+  showingGambling = !showingGambling;
+  showingShop = false;
+  showingChemistry = false;
+}
+
+function toggleChemistry() {
+  showingChemistry = !showingChemistry;
+  showingShop = false;
+  showingGambling = false;
+}
+
+function toggleCaterpillar() {
+  caterpillar.active = !caterpillar.active;
+  if (caterpillar.active) {
+    caterpillar.x = 100;
+    caterpillar.hunger = 50;
+  }
+  document.getElementById('btn-feed').style.display = caterpillar.active ? 'block' : 'none';
+}
+
+function feedCaterpillarBtn() {
+  if (caterpillar.active) {
+    feedCaterpillar();
+  }
+}
+
+function switchToArena() {
+  switchGameMode("arena");
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+}
+
+function switchToSim() {
+  switchGameMode("simulation");
+  showingShop = false;
+  showingGambling = false;
+  showingChemistry = false;
+}
+
+function togglePause() {
+  paused = !paused;
+  keys = {};
+  lastTime = performance.now();
+}
+
+function updateGUI() {
+  // Update coin display
+  document.getElementById('coin-count').textContent = playerStats.coins;
+  
+  // Update caterpillar feed button visibility
+  document.getElementById('btn-feed').style.display = caterpillar.active ? 'block' : 'none';
+}
+
+// ================== Simple 3D Renderer ==================
+const renderer3D = {
+  enabled: true,
+  camera: {
+    x: 450,
+    y: 250,
+    z: -500,
+    fov: 400
+  },
+  lightSource: { x: 200, y: -300, z: -200 }
+};
+
+// Project 3D point to 2D screen coordinates
+function project3D(x, y, z) {
+  const cam = renderer3D.camera;
+  const scale = cam.fov / (cam.fov + z - cam.z);
+  return {
+    x: cam.x + (x - cam.x) * scale,
+    y: cam.y + (y - cam.y) * scale,
+    scale: scale
+  };
+}
+
+// Calculate simple lighting
+function calculateLighting(x, y, z, baseColor) {
+  const light = renderer3D.lightSource;
+  const dx = light.x - x;
+  const dy = light.y - y;
+  const dz = light.z - z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const intensity = Math.max(0.3, Math.min(1, 800 / dist));
+  return intensity;
+}
+
+// Draw a 3D sphere (for ball)
+function draw3DSphere(x, y, z, radius, color) {
+  if (!renderer3D.enabled) return;
+  
+  const projected = project3D(x, y, z);
+  const projectedRadius = radius * projected.scale;
+  const lighting = calculateLighting(x, y, z, color);
+  
+  ctx.save();
+  
+  // Main sphere with gradient for 3D effect
+  const gradient = ctx.createRadialGradient(
+    projected.x - projectedRadius * 0.3,
+    projected.y - projectedRadius * 0.3,
+    0,
+    projected.x,
+    projected.y,
+    projectedRadius
+  );
+  
+  // Parse color and apply lighting
+  gradient.addColorStop(0, `rgba(255,255,255,${0.8 * lighting})`);
+  gradient.addColorStop(0.3, color);
+  gradient.addColorStop(1, `rgba(0,0,0,${0.5})`);
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(projected.x, projected.y, projectedRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Specular highlight
+  ctx.fillStyle = `rgba(255,255,255,${0.6 * lighting})`;
+  ctx.beginPath();
+  ctx.arc(
+    projected.x - projectedRadius * 0.25,
+    projected.y - projectedRadius * 0.25,
+    projectedRadius * 0.2,
+    0, Math.PI * 2
+  );
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+// Draw a 3D box/cuboid (for players, net, etc.)
+function draw3DBox(x, y, z, width, height, depth, color, options = {}) {
+  if (!renderer3D.enabled) return;
+  
+  const lighting = calculateLighting(x + width/2, y + height/2, z);
+  
+  // Front face
+  const frontTL = project3D(x, y, z);
+  const frontTR = project3D(x + width, y, z);
+  const frontBL = project3D(x, y + height, z);
+  const frontBR = project3D(x + width, y + height, z);
+  
+  // Back face
+  const backTL = project3D(x, y, z + depth);
+  const backTR = project3D(x + width, y, z + depth);
+  const backBL = project3D(x, y + height, z + depth);
+  const backBR = project3D(x + width, y + height, z + depth);
+  
+  ctx.save();
+  
+  // Draw back face (darker)
+  ctx.fillStyle = shadeColor(color, -40);
+  ctx.beginPath();
+  ctx.moveTo(backTL.x, backTL.y);
+  ctx.lineTo(backTR.x, backTR.y);
+  ctx.lineTo(backBR.x, backBR.y);
+  ctx.lineTo(backBL.x, backBL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw top face
+  ctx.fillStyle = shadeColor(color, 20 * lighting);
+  ctx.beginPath();
+  ctx.moveTo(frontTL.x, frontTL.y);
+  ctx.lineTo(frontTR.x, frontTR.y);
+  ctx.lineTo(backTR.x, backTR.y);
+  ctx.lineTo(backTL.x, backTL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw right face
+  ctx.fillStyle = shadeColor(color, -20);
+  ctx.beginPath();
+  ctx.moveTo(frontTR.x, frontTR.y);
+  ctx.lineTo(backTR.x, backTR.y);
+  ctx.lineTo(backBR.x, backBR.y);
+  ctx.lineTo(frontBR.x, frontBR.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw front face (brightest)
+  ctx.fillStyle = shadeColor(color, 10 * lighting);
+  ctx.beginPath();
+  ctx.moveTo(frontTL.x, frontTL.y);
+  ctx.lineTo(frontTR.x, frontTR.y);
+  ctx.lineTo(frontBR.x, frontBR.y);
+  ctx.lineTo(frontBL.x, frontBL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw left face
+  ctx.fillStyle = shadeColor(color, -30);
+  ctx.beginPath();
+  ctx.moveTo(frontTL.x, frontTL.y);
+  ctx.lineTo(backTL.x, backTL.y);
+  ctx.lineTo(backBL.x, backBL.y);
+  ctx.lineTo(frontBL.x, frontBL.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+// Draw 3D cylinder (for net poles)
+function draw3DCylinder(x, y, z, radius, height, color) {
+  if (!renderer3D.enabled) return;
+  
+  const segments = 8;
+  const lighting = calculateLighting(x, y, z);
+  
+  ctx.save();
+  
+  // Draw cylinder body
+  for (let i = 0; i < segments; i++) {
+    const angle1 = (i / segments) * Math.PI * 2;
+    const angle2 = ((i + 1) / segments) * Math.PI * 2;
+    
+    const x1 = x + Math.cos(angle1) * radius;
+    const z1 = z + Math.sin(angle1) * radius;
+    const x2 = x + Math.cos(angle2) * radius;
+    const z2 = z + Math.sin(angle2) * radius;
+    
+    const p1Top = project3D(x1, y, z1);
+    const p2Top = project3D(x2, y, z2);
+    const p1Bot = project3D(x1, y + height, z1);
+    const p2Bot = project3D(x2, y + height, z2);
+    
+    // Shade based on angle to light
+    const shade = Math.cos(angle1) * 30;
+    ctx.fillStyle = shadeColor(color, shade * lighting);
+    
+    ctx.beginPath();
+    ctx.moveTo(p1Top.x, p1Top.y);
+    ctx.lineTo(p2Top.x, p2Top.y);
+    ctx.lineTo(p2Bot.x, p2Bot.y);
+    ctx.lineTo(p1Bot.x, p1Bot.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  // Draw top ellipse
+  const topCenter = project3D(x, y, z);
+  ctx.fillStyle = shadeColor(color, 40 * lighting);
+  ctx.beginPath();
+  ctx.ellipse(topCenter.x, topCenter.y, radius * topCenter.scale, radius * topCenter.scale * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+// Helper to shade colors
+function shadeColor(color, percent) {
+  // Handle hex colors
+  if (color.startsWith('#')) {
+    let R = parseInt(color.substring(1, 3), 16);
+    let G = parseInt(color.substring(3, 5), 16);
+    let B = parseInt(color.substring(5, 7), 16);
+
+    R = Math.min(255, Math.max(0, R + percent));
+    G = Math.min(255, Math.max(0, G + percent));
+    B = Math.min(255, Math.max(0, B + percent));
+
+    return `rgb(${Math.round(R)},${Math.round(G)},${Math.round(B)})`;
+  }
+  // Handle rgb colors
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (match) {
+    let R = Math.min(255, Math.max(0, parseInt(match[1]) + percent));
+    let G = Math.min(255, Math.max(0, parseInt(match[2]) + percent));
+    let B = Math.min(255, Math.max(0, parseInt(match[3]) + percent));
+    return `rgb(${Math.round(R)},${Math.round(G)},${Math.round(B)})`;
+  }
+  return color;
+}
+
+// Draw 3D ground plane
+function draw3DGround() {
+  if (!renderer3D.enabled) return;
+  
+  ctx.save();
+  
+  // Draw grid lines for 3D effect
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  
+  const gridSize = 50;
+  const gridDepth = 200;
+  
+  for (let i = 0; i <= 900; i += gridSize) {
+    const front = project3D(i, groundY + 90, 0);
+    const back = project3D(i, groundY + 90, gridDepth);
+    ctx.beginPath();
+    ctx.moveTo(front.x, front.y);
+    ctx.lineTo(back.x, back.y);
+    ctx.stroke();
+  }
+  
+  for (let z = 0; z <= gridDepth; z += gridSize) {
+    const left = project3D(0, groundY + 90, z);
+    const right = project3D(900, groundY + 90, z);
+    ctx.beginPath();
+    ctx.moveTo(left.x, left.y);
+    ctx.lineTo(right.x, right.y);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+
+// Draw 3D shadow under object
+function draw3DShadow(x, y, width, height) {
+  if (!renderer3D.enabled) return;
+  
+  ctx.save();
+  const shadowY = groundY + 85;
+  const projected = project3D(x + width/2, shadowY, 20);
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(projected.x, projected.y, width * projected.scale * 0.8, height * projected.scale * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 3D Character renderer
+function draw3DCharacter(player) {
+  if (!renderer3D.enabled) return;
+  
+  const x = player.x;
+  const y = player.y;
+  const w = player.w;
+  const h = player.h;
+  const color = player.color;
+  const z = player.side === "left" ? 10 : 30; // Slight depth difference
+  
+  // Shadow
+  draw3DShadow(x, y, w, h);
+  
+  // Body (3D box)
+  draw3DBox(x + 5, y + 25, z, w - 10, h - 35, 15, color);
+  
+  // Head (3D sphere approximation using box)
+  const headSize = 18;
+  draw3DBox(x + w/2 - headSize/2, y, z + 2, headSize, headSize, 12, '#FFE4C4');
+  
+  // Arms
+  const armWidth = 6;
+  const armLength = 25;
+  draw3DBox(x - 2, y + 30, z + 5, armWidth, armLength, 5, color);
+  draw3DBox(x + w - armWidth + 2, y + 30, z + 5, armWidth, armLength, 5, color);
+  
+  // Legs
+  const legWidth = 8;
+  const legLength = 30;
+  draw3DBox(x + 8, y + h - legLength, z + 3, legWidth, legLength, 6, color);
+  draw3DBox(x + w - legWidth - 8, y + h - legLength, z + 3, legWidth, legLength, 6, color);
+}
+
+// Toggle 3D mode
+function toggle3D() {
+  renderer3D.enabled = !renderer3D.enabled;
+}
+
+function toggle3DBtn() {
+  toggle3D();
+  const btn = document.getElementById('btn-3d');
+  if (renderer3D.enabled) {
+    btn.classList.add('active');
+    btn.textContent = '🎮 3D: ON';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🎮 3D: OFF';
+  }
+}
+
+// Initialize 3D button state
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('btn-3d');
+  if (btn) {
+    btn.classList.add('active');
+    btn.textContent = '🎮 3D: ON';
+  }
+});
 
 requestAnimationFrame(gameLoop);
 </script>
